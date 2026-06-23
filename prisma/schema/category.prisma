@@ -1,0 +1,7 @@
+model Category {
+  id        String   @id @default(ulid())
+  title     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  post      Post[]
+}

@@ -1,0 +1,21 @@
+enum USER_STATUS {
+  ACTIVE
+  DELETE
+  BLOCK
+}
+
+enum ROLE {
+    USER 
+  ADMIN
+}
+
+enum PAYMENT_STATUS {
+  FREE
+  PAID
+}
+
+enum POST_STATUS {
+  DRAFT
+  APPROVED
+  REJECTED
+}
