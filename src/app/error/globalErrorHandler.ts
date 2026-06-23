@@ -1,9 +1,12 @@
-
-import type { NextFunction, Request, Response } from "express";
+/* eslint-disable @typescript-eslint/no-unused-vars */
+import { status } from 'http-status';
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import type {  NextFunction, Request, Response } from "express";
 import { envVars } from "../config/env.config";
-import status from "http-status";
 import { AppError } from "./errorHelpler/AppError";
 import type { TErrorResponse, TErrorSources } from "../interface/error.interface";
+import { handleZodError } from "./errorHelpler/zodError";
+import z from 'zod';
 
 export const globalsErrorHandler = async(err:any,req:Request,res:Response,next:NextFunction) => {
   if (envVars.NODE_ENV === 'development') {
@@ -26,6 +29,14 @@ export const globalsErrorHandler = async(err:any,req:Request,res:Response,next:N
      }
     ]
   }
+  else if (err instanceof z.ZodError ) {
+    const simplifiedError = handleZodError(err);
+    statusCode = simplifiedError.statusCode as number;
+    message = simplifiedError.message;
+    stack = simplifiedError.stack;
+    errorSources=[...simplifiedError.errorSources]
+  }
+
   else if (err instanceof Error) {
     statusCode = status.INTERNAL_SERVER_ERROR;
     message = err.message;
@@ -37,12 +48,14 @@ export const globalsErrorHandler = async(err:any,req:Request,res:Response,next:N
       }
     ]
   }
-  const errorRespose:TErrorResponse= {
+  const errorRespose: TErrorResponse = {
+    statusCode,
     success: false,
     message: message,
     errorSources,
     error: envVars.NODE_ENV === "development" ? err : undefined,
     stack: envVars.NODE_ENV === "development" ? stack : undefined,
   }
-  res.status(statusCode).json(errorRespose )
+  res.status(statusCode).json(errorRespose)
+
 } 
