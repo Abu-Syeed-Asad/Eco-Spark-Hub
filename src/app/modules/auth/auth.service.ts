@@ -233,7 +233,7 @@ const restPasswor =async (email: string, otp: string, newPassword: string)=>{
 }
 
 }
-const getNewToken = async (refresToken: string, sessionToken:string) => {
+const getNewToken = async (refresToken: string, sessionToken: string) => {
   const isSessionTokenExist = await prisma.session.findFirst({
     where: {
       token: sessionToken
@@ -248,48 +248,68 @@ const getNewToken = async (refresToken: string, sessionToken:string) => {
   };
   const data = jwtUtils.verifyToken(refresToken, envVars.REFRESH_TOKEN_SECRET);
   if (!data.success && data.error) {
-    throw new AppError(status.NOT_FOUND,"token not found ")
+    throw new AppError(status.NOT_FOUND, "token not found ")
   }
 
 
-    const newAccessToken = tokenUtils.getAccessToken({
-        userId: data.user?.id,
-        role: data.role,
-        name: data.name,
-        email: data.email,
-        status: data.status,
-        isDeleted: data.isDeleted,
-        emailVerified: data.emailVerified,
+  const newAccessToken = tokenUtils.getAccessToken({
+    userId: data.user?.id,
+    role: data.role,
+    name: data.name,
+    email: data.email,
+    status: data.status,
+    isDeleted: data.isDeleted,
+    emailVerified: data.emailVerified,
+  });
+
+  const newRefreshToken = tokenUtils.getRefreshToken({
+    userId: data.userId,
+    role: data.role,
+    name: data.name,
+    email: data.email,
+    status: data.status,
+    isDeleted: data.isDeleted,
+    emailVerified: data.emailVerified,
+  });
+
+  const { token } = await prisma.session.update({
+    where: {
+      token: sessionToken
+    },
+    data: {
+      token: sessionToken,
+      expiresAt: new Date(Date.now() + 60 * 60 * 60 * 24 * 1000),
+      updatedAt: new Date(),
+    }
+  })
+
+  return {
+    access_token: newAccessToken,
+    refresh_token: newRefreshToken,
+    session_token: token,
+  };
+
+};
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const googleLoginSuccess = async (session : Record<string, any>) =>{
+    const accessToken = tokenUtils.getAccessToken({
+        userId: session.user.id,
+        role: session.user.role,
+        name: session.user.name,
     });
 
-    const newRefreshToken = tokenUtils.getRefreshToken({
-        userId: data.userId,
-        role: data.role,
-        name: data.name,
-        email: data.email,
-        status: data.status,
-        isDeleted: data.isDeleted,
-        emailVerified: data.emailVerified,
+    const refreshToken = tokenUtils.getRefreshToken({
+        userId: session.user.id,
+        role: session.user.role,
+        name: session.user.name,
     });
-
-    const {token} = await prisma.session.update({
-        where : {
-            token : sessionToken
-        },
-        data : {
-            token : sessionToken,
-            expiresAt: new Date(Date.now() + 60 * 60 * 60 * 24 * 1000),
-            updatedAt: new Date(),
-        }
-    })
 
     return {
-      access_token: newAccessToken,
-      refresh_token: newRefreshToken,
-      session_token: token,
-    };
-
+        accessToken,
+        refreshToken,
+    }
 }
+
 
 export const authService = {
   userRegistation,
@@ -300,5 +320,6 @@ export const authService = {
   lotoutUser,
   forgetPassword,
   restPasswor,
-  getNewToken
+  getNewToken,
+  googleLoginSuccess
 };
