@@ -5,6 +5,9 @@ model User {
   status        USER_STATUS @default(ACTIVE)
   phone         String?
   role          ROLE        @default(USER)
+  needPasswordChange Boolean    @default(false)
+  isDeleted          Boolean    @default(false)
+  deletedAt          DateTime?
   emailVerified Boolean     @default(false)
   image         String?
   createdAt     DateTime    @default(now())
