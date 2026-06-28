@@ -6,6 +6,7 @@ const router = Router()
 
 router.use('/category', categoryRouter);
 router.use('/post', postRouter)
-router.use('/auth',authRouter)
+router.use('/auth', authRouter)
+
 
 export const index_Router: Router = router;

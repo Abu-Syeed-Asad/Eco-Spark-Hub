@@ -1,8 +1,21 @@
+import type { PAYMENT_STATUS, POST_STATUS } from "../../../generated/prisma/enums";
+
 
 export interface IPostInterface{
-  titel: string;
+  title: string;
   description: string;
+  photo?: string;
+  paymentStatus:PAYMENT_STATUS;
+  status: POST_STATUS;
   userId: string;
   categoryId: string; 
-
+}
+export interface IIUpdatePostInterface{
+  title?: string;
+  description?: string;
+  photo?: string;
+  paymentStatus?:PAYMENT_STATUS;
+  status?: POST_STATUS;
+  userId?: string;
+  categoryId?: string; 
 }

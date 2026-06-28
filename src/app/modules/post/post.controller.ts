@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import type { Request, Response } from "express";
 import { postService } from "./post.service";
 import { catchAsync } from "../../shared/catchAsync";
@@ -8,27 +7,30 @@ import status from "http-status";
 
 
 const createPost = catchAsync(async (req: Request, res: Response) => {
-  try {
-    const payload = req.body;
-    const result = await postService.createPost(payload);
-    sendRespose(res, {
-      httpStatusCode: status.OK,
-      success: true,
-      message: "success fully post created",
-      data:result
-    });
-  } catch (error:any) {
-    sendRespose(res, {
-      httpStatusCode:404,
-      success: false,
-      message: "post create failed",
-      
-    })
-    throw new Error("post create failed ",{cause:error})
-  }
+  const payload = {
+    ...req.body,
+    photo: req.file?.path || req.file?.filename || req.body.photo,
+  };
+  const result = await postService.createPost(payload);
+  sendRespose(res, {
+    httpStatusCode: status.OK,
+    message: "success fully post created",
+    success: true,
+    data:result
+  })
+})
+const getalPost = catchAsync(async (req: Request, res: Response) => {
+  const result = await postService.getAllPost();
+  sendRespose(res, {
+    success: true,
+    httpStatusCode: status.OK,
+    message: 'all post ',
+    data: result
+  })
 })
 
 
 export const postController = {
-  createPost
+  createPost,
+  getalPost,
 }
