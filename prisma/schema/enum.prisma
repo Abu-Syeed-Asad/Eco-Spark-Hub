@@ -19,3 +19,7 @@ enum POST_STATUS {
   APPROVED
   REJECTED
 }
+enum VoteType {
+  UPVOTE
+  DOWNVOTE
+}
