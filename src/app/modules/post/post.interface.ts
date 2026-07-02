@@ -11,6 +11,7 @@ export interface IPostInterface {
   status: POST_STATUS;
   userId: string;
   categoryId: string;
+  taka: number;
 }
 export interface IIUpdatePostInterface {
   title?: string;

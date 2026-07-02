@@ -12,6 +12,11 @@ enum ROLE {
 enum PAYMENT_STATUS {
   FREE
   PAID
+  UNPAID
+}
+enum STRIPE_PAYMENT_STATUS {
+  PAID
+  UNPAID
 }
 
 enum POST_STATUS {

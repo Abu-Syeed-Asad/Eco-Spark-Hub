@@ -11,7 +11,7 @@ const router = Router()
 router.post("/create", MulterUpload.single("photo"), checkAuth(ROLE.USER), zodSchemaRequestValidation(postSchema), postController.createPost);
 router.get('/all-post', postController.getalPost)
 router.patch('/update/:id', MulterUpload.single("photo"), postController.updatePost)
-router.get('/:id', postController.deletePost)
+router.delete('/:id', postController.deletePost)
 router.get('/:id', postController.specificPost)
 
 

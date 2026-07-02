@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "Post" ADD COLUMN     "stripePaymentStatus" "STRIPE_PAYMENT_STATUS" NOT NULL DEFAULT 'UNPAID';

@@ -11,4 +11,11 @@ export const postSchema = z.object({
   paymentStatus: z.enum(["FREE", "PAID"]).default("FREE"),
   userId: z.string(),
   categoryId: z.string().ulid(),
+  taka: z.preprocess((val) => {
+    if (typeof val === "string") {
+      const parsed = Number(val);
+      return Number.isNaN(parsed) ? val : parsed;
+    }
+    return val;
+  }, z.number()),
 });
