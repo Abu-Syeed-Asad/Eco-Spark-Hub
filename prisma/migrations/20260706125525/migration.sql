@@ -1,0 +1,5 @@
+-- CreateEnum
+CREATE TYPE "ACCOUNT_TYPE" AS ENUM ('USER', 'COMPANY');
+
+-- AlterTable
+ALTER TABLE "FinanceLog" ADD COLUMN     "accountType" "ACCOUNT_TYPE" NOT NULL DEFAULT 'USER';

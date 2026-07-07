@@ -6,7 +6,7 @@ export interface ISendRespose<T> {
   meta?: {
     page: number;
     limit: number;
-    tatal: number;
+    total: number;
     totalPages: number;
   };
 }

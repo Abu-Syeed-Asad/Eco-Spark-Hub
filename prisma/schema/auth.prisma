@@ -1,21 +1,26 @@
 model User {
-  id                 String      @id
+  id                 String          @id
   name               String
   email              String
-  status             USER_STATUS @default(ACTIVE)
+  status             USER_STATUS     @default(ACTIVE)
   phone              String?
-  role               ROLE        @default(USER)
-  needPasswordChange Boolean     @default(false)
-  isDeleted          Boolean     @default(false)
+  role               ROLE            @default(USER)
+  needPasswordChange Boolean         @default(false)
+  isDeleted          Boolean         @default(false)
   deletedAt          DateTime?
-  emailVerified      Boolean     @default(false)
+  emailVerified      Boolean         @default(false)
   image              String?
-  createdAt          DateTime    @default(now())
-  updatedAt          DateTime    @updatedAt
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+  totalAmount        Float           @default(0)
   sessions           Session[]
   accounts           Account[]
   posts              Post[]
   comments           Comment[]
+  payments           Payment[]
+  financeRelation    FinanceLog[]
+  reports            report[]
+  notifications      notifications[]
 
   @@unique([email])
   @@map("user")
@@ -68,4 +73,3 @@ model Verification {
   @@index([identifier])
   @@map("verification")
 }
-

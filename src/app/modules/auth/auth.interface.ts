@@ -1,4 +1,3 @@
-
 export interface IRegister {
   name: string;
   email: string;
@@ -8,11 +7,16 @@ export interface IRegister {
 
 export interface ILogin {
   email: string;
-  password:string
+  password: string;
 }
 
-export interface IChangePassword{
+export interface IChangePassword {
   currentPassword: string;
   newPassword: string;
 }
 
+export interface IUserUpdatePayload {
+  name?: string;
+  pnone?: string;
+  image?: string;
+}

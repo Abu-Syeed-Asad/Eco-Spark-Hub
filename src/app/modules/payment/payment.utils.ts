@@ -1,13 +1,17 @@
-
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import PDFDocument from "pdfkit";
+import fs from "fs";
+import path from "path";
 
 interface InvoiceData {
   invoiceId: string;
   userName: string;
   userEmail: string;
-  amount:    number;
+  amount: number;
   transactionId: string;
   paymentDate: string;
+  description?: string;
+  logoPath?: string;
 }
 
 export const generateInvoicePdf = async (
@@ -15,160 +19,214 @@ export const generateInvoicePdf = async (
 ): Promise<Buffer> => {
   return new Promise((resolve, reject) => {
     try {
-      const doc = new PDFDocument({
-        size: "A4",
-        margin: 50,
-      });
+      const doc = new PDFDocument({ size: "A4", margin: 48 });
 
       const chunks: Buffer[] = [];
+      doc.on("data", (chunk) => chunks.push(chunk));
+      doc.on("end", () => resolve(Buffer.concat(chunks)));
+      doc.on("error", reject);
 
-      doc.on("data", (chunk) => {
-        chunks.push(chunk);
-      });
+      // Colors & layout
+      const primary = "#0e4285"; // deep blue
+      const accent = "#0ca678"; // green accent
 
-      doc.on("end", () => {
-        resolve(Buffer.concat(chunks));
-      });
+      // HEADER
+      const logoX = 52;
+      const logoY = 48;
+      const logoSize = 64;
 
-      doc.on("error", (error) => {
-        reject(error);
-      });
+      // If a logo path is provided and exists, render it
+      if (data.logoPath) {
+        try {
+          const resolved = path.isAbsolute(data.logoPath)
+            ? data.logoPath
+            : path.join(process.cwd(), data.logoPath);
+          if (fs.existsSync(resolved)) {
+            doc.image(resolved, logoX, logoY, {
+              width: logoSize,
+              height: logoSize,
+            });
+          } else {
+            // fallback: draw circular icon
+            doc.save();
+            doc
+              .circle(logoX + logoSize / 2, logoY + logoSize / 2, logoSize / 2)
+              .fill(accent);
+            doc
+              .fillColor("white")
+              .fontSize(18)
+              .font("Helvetica-Bold")
+              .text("ES", logoX + 12, logoY + 14);
+            doc.restore();
+          }
+        } catch (err) {
+          // silently ignore image issues and draw fallback
+          doc.save();
+          doc
+            .circle(logoX + logoSize / 2, logoY + logoSize / 2, logoSize / 2)
+            .fill(accent);
+          doc
+            .fillColor("white")
+            .fontSize(18)
+            .font("Helvetica-Bold")
+            .text("ES", logoX + 12, logoY + 14);
+          doc.restore();
+        }
+      } else {
+        // draw circular icon fallback
+        doc.save();
+        doc
+          .circle(logoX + logoSize / 2, logoY + logoSize / 2, logoSize / 2)
+          .fill(accent);
+        doc
+          .fillColor("white")
+          .fontSize(18)
+          .font("Helvetica-Bold")
+          .text("ES", logoX + 12, logoY + 14);
+        doc.restore();
+      }
 
-      // Header
-      doc.fontSize(24).font("Helvetica-Bold").text("INVOICE", {
-        align: "center",
-      });
-
-      doc.moveDown(0.5);
-      doc.fontSize(10).font("Helvetica").text("PH Healthcare Services", {
-        align: "center",
-      });
-      doc.text("Your Health, Our Priority", { align: "center" });
-
-      doc.moveDown(1);
-
-      // Horizontal line
-      doc.moveTo(50, doc.y).lineTo(545, doc.y).stroke();
-
-      doc.moveDown(1);
-
-      // Invoice Details - Left Column
-      doc.fontSize(11).font("Helvetica-Bold").text("Invoice Information");
+      // Company name and contact
       doc
-        .fontSize(10)
-        .font("Helvetica")
-        .text(`Invoice ID: ${data.invoiceId}`)
-        .text(
-          `Payment Date: ${new Date(data.paymentDate).toLocaleDateString()}`,
-        )
-        .text(`Transaction ID: ${data.transactionId}`);
-
-      doc.moveDown(0.8);
-
-      // Patient Information
-      doc.fontSize(11).font("Helvetica-Bold").text("Patient Information");
-      doc
-        .fontSize(10)
-        .font("Helvetica")
-        .text(`Name: ${data.userName}`)
-        .text(`Email: ${data.userEmail}`);
-
-      doc.moveDown(0.8);
-
-      // Doctor Information
-      doc.fontSize(11).font("Helvetica-Bold").text("Doctor Information");
-     
-
-      doc.moveDown(0.8);
-
-      // Appointment Details
-      doc.fontSize(11).font("Helvetica-Bold").text("Appointment Details");
-      doc
-        .fontSize(10)
-        .font("Helvetica")
-
-      doc.moveDown(1);
-
-      // Horizontal line
-      doc.moveTo(50, doc.y).lineTo(545, doc.y).stroke();
-
-      doc.moveDown(1);
-
-      // Amount Table
-      const tableTop = doc.y;
-      const col1X = 50;
-      const col2X = 450;
-
-      doc
-        .fontSize(11)
+        .fillColor("black")
+        .fontSize(18)
         .font("Helvetica-Bold")
-        .text("Payment Summary", col1X, tableTop);
-
-      doc.moveDown(0.8);
-
-      // Table Header
-      const headerY = doc.y;
-      doc.fontSize(10).font("Helvetica-Bold");
-      doc.text("Description", col1X, headerY);
-      doc.text("Amount", col2X, headerY, { align: "right" });
-
-      // Separator line
+        .text("ECO-SPARK-HUB", logoX + logoSize + 14, logoY + 10);
       doc
-        .moveTo(col1X, doc.y)
-        .lineTo(col2X + 80, doc.y)
+        .fontSize(10)
+        .font("Helvetica")
+        .fillColor("gray")
+        .text("mda457956@gmail.com", logoX + logoSize + 14, logoY + 34);
+
+      // Right: Invoice title
+      doc
+        .fontSize(34)
+        .fillColor(primary)
+        .font("Helvetica-Bold")
+        .text("INVOICE", 380, logoY + 6, { align: "right" });
+      doc
+        .fontSize(10)
+        .font("Helvetica")
+        .fillColor("gray")
+        .text("Thank you for your trust in Eco-Spark Hub", 380, logoY + 46, {
+          align: "right",
+        });
+
+      doc.moveDown(2);
+
+      // Horizontal line
+      const startY = 120;
+      doc
+        .moveTo(48, startY)
+        .lineTo(548, startY)
+        .lineWidth(1)
+        .strokeColor("#e6eef8")
         .stroke();
 
-      doc.moveDown(0.5);
+      // INFO BLOCK
+      const leftX = 52;
+      const rightX = 320;
+      const infoTop = startY + 14;
 
-      // Amount Row
-      const amountY = doc.y;
-      doc.fontSize(10).font("Helvetica");
-      doc.text("Consultation Fee", col1X, amountY);
-      doc.text(`${data.amount.toFixed(2)} BDT`, col2X, amountY, {
-        align: "right",
-      });
-
-      doc.moveDown(0.8);
-
-      // Total Row
-      const totalY = doc.y;
-      doc.fontSize(11).font("Helvetica-Bold");
-      doc.text("Total Amount", col1X, totalY);
-      doc.text(`${data.amount.toFixed(2)} BDT`, col2X, totalY, {
-        align: "right",
-      });
-
-      // Separator line
+      // Invoice Details (left)
       doc
-        .moveTo(col1X, doc.y)
-        .lineTo(col2X + 80, doc.y)
-        .stroke();
+        .font("Helvetica-Bold")
+        .fontSize(11)
+        .fillColor("#0b2545")
+        .text("Invoice Information", leftX, infoTop);
+      doc.moveTo(leftX, doc.y + 4);
+      doc
+        .font("Helvetica")
+        .fontSize(10)
+        .fillColor("black")
+        .text(`Invoice ID: ${data.invoiceId}`);
+      doc.text(
+        `Payment Date: ${new Date(data.paymentDate).toLocaleDateString()}`,
+      );
+      doc.text(`Transaction ID: ${data.transactionId}`);
+
+      // User Info (right)
+      const userTop = infoTop;
+      doc
+        .font("Helvetica-Bold")
+        .fontSize(11)
+        .fillColor("#0b2545")
+        .text("User Information", rightX, userTop);
+      doc
+        .font("Helvetica")
+        .fontSize(10)
+        .fillColor("black")
+        .text(`Name: ${data.userName}`, rightX);
+      doc.text(`Email: ${data.userEmail}`, rightX);
 
       doc.moveDown(1.5);
 
-      // Footer
+      // TABLE HEADER (dark band)
+      const tableTop = doc.y + 6;
+      const tableLeft = 48;
+      const tableRight = 548;
+      const rowHeight = 22;
+
       doc
-        .fontSize(9)
+        .rect(tableLeft, tableTop, tableRight - tableLeft, rowHeight)
+        .fill(primary);
+      doc
+        .fillColor("white")
+        .font("Helvetica-Bold")
+        .fontSize(10)
+        .text("Description", tableLeft + 8, tableTop + 6);
+      doc.text("Amount", tableLeft + 360, tableTop + 6, { align: "right" });
+
+      // Table row
+      const contentY = tableTop + rowHeight + 8;
+      doc
+        .fillColor("black")
         .font("Helvetica")
-        .text(
-          "Thank you for choosing PH Healthcare. This is an electronically generated invoice.",
-          {
-            align: "center",
-          },
-        );
-
-      doc.text(
-        "If you have any questions, please contact us at support@ph-healthcare.com",
-        {
-          align: "center",
-        },
-      );
-
-      doc.text("Payment processed securely through Stripe", {
-        align: "center",
+        .fontSize(10)
+        .text(data.description ?? "Consultation Fee", tableLeft + 8, contentY);
+      doc.text(`${data.amount.toFixed(2)} BDT`, tableLeft + 360, contentY, {
+        align: "right",
       });
 
-      // End the document
+      // Divider
+      const afterRowY = contentY + 26;
+      doc
+        .moveTo(tableLeft, afterRowY)
+        .lineTo(tableRight, afterRowY)
+        .strokeColor("#e6eef8")
+        .lineWidth(1)
+        .stroke();
+
+      // TOTAL BOX (highlighted)
+      const totalBoxY = afterRowY + 12;
+      const totalBoxHeight = 28;
+      doc
+        .rect(tableLeft, totalBoxY, tableRight - tableLeft, totalBoxHeight)
+        .fill("#f3f6fb");
+      doc
+        .fillColor("#0b2545")
+        .font("Helvetica-Bold")
+        .fontSize(12)
+        .text("Total Amount", tableLeft + 8, totalBoxY + 7);
+      doc.text(
+        `${data.amount.toFixed(2)} BDT`,
+        tableLeft + 360,
+        totalBoxY + 7,
+        { align: "right" },
+      );
+
+      // FOOTER
+      doc.fontSize(9).fillColor("gray");
+      doc.text("Thank you for choosing our platform.", 0, 760, {
+        align: "center",
+      });
+      doc.text(
+        "If you have any questions, please contact us at mda457956@gmail.com",
+        0,
+        774,
+        { align: "center" },
+      );
+
       doc.end();
     } catch (error) {
       reject(error);

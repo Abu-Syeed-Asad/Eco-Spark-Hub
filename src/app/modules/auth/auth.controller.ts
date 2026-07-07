@@ -120,6 +120,19 @@ const resetPassword = catchAsync(async (req: Request, res: Response) => {
     success:true
   })
 })
+const userUpdate = catchAsync(async (req: Request, res: Response) => {
+  
+  const userInfo = req.body;
+  const payload = req.body;
+  const data= await authService.userUpdate(payload,userInfo);
+  sendRespose(res, {
+    httpStatusCode: status.OK,
+    message: "successfully reset password",
+    success: true,
+    data
+    
+  })
+})
 const getNewToken = catchAsync(async (req: Request, res: Response) => {
   const refreshToken = req.cookies.refresh_token;
   const betterAuthSessionToken = req.cookies["session_token"];
@@ -215,6 +228,8 @@ export const authController = {
   getNewToken,
   googleLogin,
   googleLoginSuccess,
-  handleOAuthError
+  handleOAuthError,
+  userUpdate,
+  
 
 };

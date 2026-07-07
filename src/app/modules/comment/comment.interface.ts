@@ -7,3 +7,8 @@ export interface IComment {
   parentId?: string;  
   votes: VoteType;
 }
+
+export interface IupdateComment {
+  content: string;
+  votes: VoteType;
+}

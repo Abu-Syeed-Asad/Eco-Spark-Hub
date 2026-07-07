@@ -1,92 +1,101 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
+import { uploadFileToCloudinary } from "./../../config/cloudinary.config";
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import type Stripe from "stripe";
 import { prisma } from "../../lib/prisma";
-import {
-  PAYMENT_STATUS,
-  STRIPE_PAYMENT_STATUS,
-} from "../../../generated/prisma/enums";
+import { STRIPE_PAYMENT_STATUS } from "../../../generated/prisma/enums";
 import { generateInvoicePdf } from "./payment.utils";
-import { uploadFileToCloudinary } from "../../config/cloudinary.config";
+import type { IRequestUser } from "../../interface/IrequestUser.interface";
 import { sendEmail } from "../../utils/emailSend";
+import { AppError } from "../../error/errorHelpler/AppError";
+import status from "http-status";
+import type { IPaymentUpdate } from "./payment.interface";
+import type { IQueryParams } from "../../interface/queryBuilder.interface";
+import { type Payment, type Prisma } from "../../../generated/prisma/client";
+import {
+  paymentSearcheblefields,
+  paymentFilterableFields,
+  paymentIncludeConfig,
+} from "./payment.constant";
+import { QueryBuilder } from "../../utils/QueryBuilder";
 
-const handleStripeWebhookEvent = async (event: Stripe.Event, email: string) => {
-  const normalizedEmail = email?.trim() || "";
-  const isUserExist = normalizedEmail
-    ? await prisma.user.findFirst({
-        where: {
-          email: normalizedEmail,
-        },
-      })
-    : null;
-
+const paymentHandler = async (event: Stripe.Event, user?: IRequestUser) => {
   const existingPayment = await prisma.payment.findFirst({
     where: {
       stripeEventId: event.id,
     },
   });
   if (existingPayment) {
-    console.log(`Event${event.id} already proceess`);
-    return { message: `Event ${event.id} already process` };
+    console.log(`Event ${event.id} already Exist here so skiping`);
+    return {
+      message: `Event ${event.id} is already processed . `,
+    };
   }
   switch (event.type) {
     case "checkout.session.completed": {
       const session = event.data.object as any;
       const postId = session.metadata?.postId;
       const paymentId = session.metadata?.paymentId;
+
       if (!postId || !paymentId) {
-        console.error("⚠️ Missing metadata in webhook event");
-        return { message: "Missing metadata" };
+        console.log(`Missing meta data `);
+        return {
+          message: "messing metadata",
+        };
       }
-      //verify post exist kore kina
-      const postExist = await prisma.post.findFirst({
+      const isPostExist = await prisma.post.findFirst({
         where: {
           id: postId,
         },
+      });
+      if (!isPostExist) {
+        console.error(
+          `⚠️ post ${postId} not found. Payment may be for expired post.`,
+        );
+        return { message: "Post not found" };
+      }
+      const isPaymetExist = await prisma.payment.findUnique({
+        where: {
+          id: paymentId,
+          postId: postId,
+        },
         include: {
           user: true,
-          payment: true,
         },
       });
-      if (postExist?.paymentStatus === PAYMENT_STATUS.FREE) {
+      if (!isPaymetExist) {
         return {
-          message: `this post  status is Free `,
+          message: `Paymen id ${paymentId} does not exist in payment data base`,
         };
       }
 
+      const paymentOwner = isPaymetExist.user;
+      const userName = paymentOwner?.name ?? user?.email ?? "Customer";
+      const userEmail = paymentOwner?.email ?? user?.email ?? "";
+
       let invoiceUrl = null;
       let pdfBuffer: Buffer | null = null;
-      const payerEmail =
-        normalizedEmail ||
-        (typeof session.customer_details?.email === "string"
-          ? session.customer_details.email
-          : "") ||
-        (typeof session.customer_email === "string"
-          ? session.customer_email
-          : "") ||
-        postExist?.user?.email ||
-        "";
 
       if (session.payment_status === "paid") {
         try {
           pdfBuffer = await generateInvoicePdf({
-            invoiceId: postExist?.payment?.id || paymentId,
-            amount: postExist?.taka || 0,
-            transactionId: postExist?.payment?.transactionId || "",
+            invoiceId: isPaymetExist.id || paymentId,
+            userName,
+            userEmail,
+            amount: isPaymetExist.amount,
             paymentDate: new Date().toISOString(),
-            userName: isUserExist?.name as string,
-            userEmail: payerEmail,
+            transactionId: isPaymetExist.transactionId,
           });
-          const pdflinkFromCloudinaryResponse = await uploadFileToCloudinary(
+          const cloudinaryResponse = await uploadFileToCloudinary(
             pdfBuffer,
-            `postPayment/invoices/${paymentId}-${Date.now()}.pdf`,
+            `postPayment/invoices/invoice-${paymentId}-${Date.now()}.pdf`,
           );
-          invoiceUrl = pdflinkFromCloudinaryResponse.url;
-          console.log(invoiceUrl);
-        } catch (error) {
-          console.log(error);
+          invoiceUrl = cloudinaryResponse.secure_url;
+        } catch (pdfError) {
+          console.error("❌ Error generating/uploading invoice PDF:", pdfError);
         }
       }
-      const updatePayment = await prisma.payment.update({
+      const paymentUpdateConfrom = await prisma.payment.update({
         where: {
           id: paymentId,
         },
@@ -102,55 +111,164 @@ const handleStripeWebhookEvent = async (event: Stripe.Event, email: string) => {
       });
       if (session.payment_status === "paid" && invoiceUrl) {
         try {
-          await sendEmail({
-            to: payerEmail,
-            subject: `post Title ${postExist?.title}`,
-            templateName: "invoice",
-            templateData: {
-              invoiceId: updatePayment.postId,
-              transactionId: updatePayment?.transactionId,
-              invoiceUrl: invoiceUrl,
-            },
-            attachments: [
-              {
-                fileName: `invoice${paymentId}.pdf`,
-                content: pdfBuffer || Buffer.from(""),
-                contentType: "aplication/pdf",
+          if (userEmail) {
+            await sendEmail({
+              to: userEmail,
+              subject: `post payment conform ${paymentId}`,
+              templateName: "invoice",
+              templateData: {
+                PostTitle: isPostExist.title,
+                transection: isPaymetExist.transactionId,
+                paymentDate: new Date().toISOString(),
+                amount: isPaymetExist.amount,
+                invoiceUrl: invoiceUrl,
               },
-            ],
-          });
-          console.log(`✅ Invoice email sent to ${email}`);
+              attachments: [
+                {
+                  fileName: `invoice-${paymentId}.pdf`,
+                  content: pdfBuffer || Buffer.from(""),
+                  contentType: "Post/pdf",
+                },
+              ],
+            });
+            console.log(`✅ Invoice email sent to ${userEmail}`);
+          }
+          return {
+            invoiceUrl,
+            paymentUpdateConfrom,
+          };
         } catch (error) {
           console.log(error);
         }
       }
-      console.log(
-        `✅ Payment ${session.payment_status} for appointment ${updatePayment.postId}`,
-      );
       break;
     }
     case "checkout.session.expired": {
       const session = event.data.object;
-
       console.log(
-        `Checkout session ${session.id} expired. Marking associated payment as failed.`,
+        `CheckOut sessoin ${session.id} expired marking associated payment as feld`,
       );
       break;
     }
     case "payment_intent.payment_failed": {
       const session = event.data.object;
-
       console.log(
         `Payment intent ${session.id} failed. Marking associated payment as failed.`,
       );
       break;
     }
     default:
-      console.log(`Unhandled event type ${event.type}`);
-  }
+      {
+        console.log(`Unhandled event type ${event.type}`);
+      }
 
-  return { message: `Webhook Event ${event.id} processed successfully` };
+      return { message: `Webhook Event ${event.id} processed successfully` };
+  }
 };
-export const PaymentService = {
-  handleStripeWebhookEvent,
+const allPayment = async (query: IQueryParams) => {
+  const queryBuilder = new QueryBuilder<
+    Payment,
+    Prisma.PaymentWhereInput,
+    Prisma.PaymentInclude
+  >(prisma.payment, query, {
+    searchableFields: paymentSearcheblefields,
+    filterableFields: paymentFilterableFields,
+  });
+ const result = await queryBuilder
+    .search()
+    .filter()
+    .where({ status: STRIPE_PAYMENT_STATUS.PAID })
+    .include({
+      user: true,
+      post: {
+        include: {
+          category:true
+        }
+      }
+    })
+    .dynamicInclude(paymentIncludeConfig)
+    .pagination()
+    .sort()
+    .fields()
+    .execute();
+
+  // If result is a direct array of data:
+  return result;
+};
+  
+const specificPayment = async (transectionId: string) => {
+  const data = await prisma.payment.findFirst({
+    where: {
+      transactionId: transectionId,
+    },
+    include: {
+      user: true,
+      post: true,
+    },
+  });
+  if (!data) {
+    throw new AppError(
+      status.NOT_FOUND,
+      `payment info not found in the database `,
+    );
+  }
+  return data;
+};
+const updatePayment = async (
+  transectionId: string,
+  payload: IPaymentUpdate,
+) => {
+  const updatePayment = await prisma.payment.update({
+    where: {
+      transactionId: transectionId,
+    },
+    data: payload,
+  });
+  if (!updatePayment) {
+    throw new AppError(
+      status.NOT_FOUND,
+      `failed to update payment info in the database `,
+    );
+  }
+  return updatePayment;
+};
+const myAllPayment = async (user: IRequestUser) => {
+  const { userId } = user;
+  const allPayment = await prisma.payment.findMany({
+    where: {
+      userId,
+    },
+    include: {
+      user: true,
+      post: true,
+    },
+  });
+  return allPayment;
+};
+const userSpecificPayment = async (id: string, user: IRequestUser) => {
+  const { userId } = user;
+  const specificPayment = await prisma.payment.findFirst({
+    where: {
+      userId,
+      id,
+    },
+    include: {
+      user: true,
+      post: true,
+    },
+  });
+  return specificPayment;
+};
+const complitedAllPayment = async () => {
+  const allPayment = await prisma.payment.findMany();
+}
+export const paymentService = {
+  paymentHandler,
+  allPayment,
+  specificPayment,
+  updatePayment,
+  myAllPayment,
+  userSpecificPayment,
+  complitedAllPayment
+  
 };

@@ -1,7 +1,8 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import status from "http-status";
 import { AppError } from "../../error/errorHelpler/AppError";
 import { auth } from "../../lib/auth";
-import type { IChangePassword, ILogin, IRegister } from "./auth.interface";
+import type { IChangePassword, ILogin, IRegister, IUserUpdatePayload } from "./auth.interface";
 import { prisma } from "../../lib/prisma";
 import { tokenUtils } from "../../utils/token.utils";
 import type { IRequestUser } from "../../interface/IrequestUser.interface";
@@ -82,9 +83,6 @@ const getMe = async (payload: IRequestUser) => {
     where: {
       id: payload.userId,
       email: payload.email,
-    },
-    include: {
-      posts: true,
     },
   });
   if (!isExist) {
@@ -290,7 +288,6 @@ const getNewToken = async (refresToken: string, sessionToken: string) => {
   };
 
 };
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const googleLoginSuccess = async (session : Record<string, any>) =>{
     const accessToken = tokenUtils.getAccessToken({
         userId: session.user.id,
@@ -309,6 +306,17 @@ const googleLoginSuccess = async (session : Record<string, any>) =>{
         refreshToken,
     }
 }
+const userUpdate = async (payload: IUserUpdatePayload, userInfo: IRequestUser) => {
+  const { userId, email } = userInfo;
+  const updteUser = await prisma.user.update({
+    where: {
+      id: userId,
+      email,
+    },
+    data: payload
+  });
+  return updteUser;
+};
 
 
 export const authService = {
@@ -321,5 +329,6 @@ export const authService = {
   forgetPassword,
   restPasswor,
   getNewToken,
-  googleLoginSuccess
+  googleLoginSuccess,
+  userUpdate,
 };

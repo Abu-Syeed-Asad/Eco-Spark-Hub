@@ -9,7 +9,7 @@ enum ROLE {
   ADMIN
 }
 
-enum PAYMENT_STATUS {
+enum POST_TYPE {
   FREE
   PAID
   UNPAID
@@ -27,4 +27,16 @@ enum POST_STATUS {
 enum VoteType {
   UPVOTE
   DOWNVOTE
+}
+
+enum  FINANCE_SOURCE {
+  POST
+  DIPOSIT
+  REWORD 
+
+}
+
+enum ACCOUNT_TYPE {
+  USER
+  COMPANY
 }

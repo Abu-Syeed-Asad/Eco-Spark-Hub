@@ -8,7 +8,7 @@ export const postSchema = z.object({
     .string()
     .min(10, { message: "Description must be at least 10 characters long" }),
   photo: z.string().optional(),
-  paymentStatus: z.enum(["FREE", "PAID"]).default("FREE"),
+  postType: z.enum(["FREE", "PAID"]).default("FREE"),
   userId: z.string(),
   categoryId: z.string().ulid(),
   taka: z.preprocess((val) => {

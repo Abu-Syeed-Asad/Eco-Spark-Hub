@@ -12,7 +12,8 @@ import { notFound } from "./app/middleware/notFount";
 import { toNodeHandler } from "better-auth/node";
 import { auth } from "./app/lib/auth";
 import { envVars } from "./app/config/env.config";
-import { paymentControler } from "./app/modules/payment/payment.controller";
+import { paymentController } from "./app/modules/payment/payment.controller";
+
 
 const app: Application = express();
 app.set("view engine", "ejs");
@@ -22,8 +23,7 @@ app.use(cookieParser());
 
 app.post(
   "/webhook",
-  express.raw({ type: "application/json" }),
-  paymentControler.handleStripeWebhookEvent,
+  express.raw({ type: "application/json" }),paymentController.handleStripeEvent
 );
 
 app.use(express.json());

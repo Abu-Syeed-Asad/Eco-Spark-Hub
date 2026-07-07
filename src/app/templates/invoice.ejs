@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Payment Invoice</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        line-height: 1.6;
+        color: #1f2937;
+        margin: 0;
+        padding: 24px;
+        background-color: #f9fafb;
+      }
+      .card {
+        max-width: 640px;
+        margin: 0 auto;
+        background: #ffffff;
+        padding: 24px;
+        border-radius: 12px;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+      }
+      .title {
+        color: #2563eb;
+        margin-bottom: 12px;
+      }
+      .label {
+        font-weight: 600;
+      }
+      .button {
+        display: inline-block;
+        margin-top: 16px;
+        padding: 10px 16px;
+        background-color: #2563eb;
+        color: #ffffff;
+        text-decoration: none;
+        border-radius: 8px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <h2 class="title">Payment Successful</h2>
+      <p>Hi there,</p>
+      <p>Your payment for <strong><%= PostTitle %></strong> was completed successfully.</p>
+      <p><span class="label">Transaction ID:</span> <%= transection %></p>
+      <p><span class="label">Payment Date:</span> <%= paymentDate %></p>
+      <p><span class="label">Amount:</span> <%= amount %></p>
+
+      <% if (invoiceUrl) { %>
+        <p>
+          <a class="button" href="<%= invoiceUrl %>" target="_blank" rel="noopener noreferrer">
+            View Invoice
+          </a>
+        </p>
+      <% } %>
+    </div>
+  </body>
+</html>

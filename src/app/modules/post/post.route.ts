@@ -6,13 +6,25 @@ import { zodSchemaRequestValidation } from "../../middleware/RequestZodvalidatio
 import { postSchema } from "./post.zodvalidation";
 import { MulterUpload } from "../../config/multer.config";
 
-const router = Router()
+const router = Router();
 
-router.post("/create", MulterUpload.single("photo"), checkAuth(ROLE.USER), zodSchemaRequestValidation(postSchema), postController.createPost);
-router.get('/all-post', postController.getalPost)
-router.patch('/update/:id', MulterUpload.single("photo"), postController.updatePost)
-router.delete('/:id', postController.deletePost)
-router.get('/:id', postController.specificPost)
+router.post(
+  "/create",
+  MulterUpload.single("photo"),
+  checkAuth(ROLE.USER),
+  zodSchemaRequestValidation(postSchema),
+  postController.createPost,
+);
+router.get("/all-post", postController.getallPost);
+router.get("/dashbord-post", checkAuth(), postController.dashbordPost);
+router.patch(
+  "/update/:id",
+  MulterUpload.single("photo"),
+  postController.updatePost,
+);
+router.delete("/:id", postController.deletePost);
+
+router.get("/:id", checkAuth(), postController.specificPost);
 
 
 export const postRouter: Router = router;
