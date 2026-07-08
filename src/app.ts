@@ -15,6 +15,7 @@ import { envVars } from "./app/config/env.config";
 import { paymentController } from "./app/modules/payment/payment.controller";
 
 
+
 const app: Application = express();
 app.set("view engine", "ejs");
 app.set("views", path.resolve(process.cwd(), `src/app/templates`));
@@ -23,8 +24,7 @@ app.use(cookieParser());
 
 app.post(
   "/webhook",
-  express.raw({ type: "application/json" }),paymentController.handleStripeEvent
-);
+  express.raw({ type: "application/json" }), paymentController.handleStripeEvent);
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));

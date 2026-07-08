@@ -5,7 +5,7 @@ enum USER_STATUS {
 }
 
 enum ROLE {
-    USER 
+  USER
   ADMIN
 }
 
@@ -14,6 +14,7 @@ enum POST_TYPE {
   PAID
   UNPAID
 }
+
 enum STRIPE_PAYMENT_STATUS {
   PAID
   UNPAID
@@ -24,16 +25,17 @@ enum POST_STATUS {
   APPROVED
   REJECTED
 }
+
 enum VoteType {
   UPVOTE
   DOWNVOTE
 }
 
-enum  FINANCE_SOURCE {
+enum FINANCE_SOURCE {
   POST
   DIPOSIT
-  REWORD 
-
+  REWORD
+  EAEN
 }
 
 enum ACCOUNT_TYPE {

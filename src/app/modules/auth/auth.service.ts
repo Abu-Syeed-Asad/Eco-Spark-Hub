@@ -1,12 +1,18 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import status from "http-status";
 import { AppError } from "../../error/errorHelpler/AppError";
 import { auth } from "../../lib/auth";
-import type { IChangePassword, ILogin, IRegister, IUserUpdatePayload } from "./auth.interface";
+import type {
+  IChangePassword,
+  ILogin,
+  IRegister,
+  IUserUpdatePayload,
+} from "./auth.interface";
 import { prisma } from "../../lib/prisma";
 import { tokenUtils } from "../../utils/token.utils";
 import type { IRequestUser } from "../../interface/IrequestUser.interface";
-import { USER_STATUS } from "../../../generated/prisma/enums";
+import { FINANCE_SOURCE, USER_STATUS } from "../../../generated/prisma/enums";
 import { jwtUtils } from "../../utils/jwt";
 import { envVars } from "../../config/env.config";
 
@@ -56,6 +62,21 @@ const userLogin = async (payload: ILogin) => {
   });
   if (!data.user) {
     throw new AppError(status.BAD_REQUEST, "User Login failed");
+  }
+  const isExistFinanceLog = await prisma.financeLog.findFirst({
+    where: {
+      userId: isExist.id,
+    },
+  });
+  if (!isExistFinanceLog) {
+    const FirstpaymentManagement = await prisma.$transaction(async (tx) => {
+      const paymentManagement = await tx.financeLog.create({
+        data: {
+          userId: isExist.id,
+          financeSource: FINANCE_SOURCE.REWORD,
+        },
+      });
+    });
   }
   const accessToken = tokenUtils.getAccessToken({
     userId: data.user.id,
@@ -109,8 +130,10 @@ const verifiyEmail = async (email: string, otp: string) => {
   }
   return result;
 };
-const changePassword = async (payload: IChangePassword, sessionToken: string) => {
-  
+const changePassword = async (
+  payload: IChangePassword,
+  sessionToken: string,
+) => {
   if (!sessionToken) {
     throw new AppError(status.UNAUTHORIZED, "No session token provided");
   }
@@ -138,117 +161,116 @@ const changePassword = async (payload: IChangePassword, sessionToken: string) =>
       Authorization: authHeader,
     }),
   });
-const accessToken = tokenUtils.getAccessToken({
-  userId: data.user.id,
-  name: data.user.name,
-  email: data.user.email,
-  role: data.user.role,
-  status: data.user.status,
-});
-const refreshToken = tokenUtils.getRefreshToken({
-  userId: data.user.id,
-  name: data.user.name,
-  email: data.user.email,
-  role: data.user.role,
-  status: data.user.status,
-});
+  const accessToken = tokenUtils.getAccessToken({
+    userId: data.user.id,
+    name: data.user.name,
+    email: data.user.email,
+    role: data.user.role,
+    status: data.user.status,
+  });
+  const refreshToken = tokenUtils.getRefreshToken({
+    userId: data.user.id,
+    name: data.user.name,
+    email: data.user.email,
+    role: data.user.role,
+    status: data.user.status,
+  });
 
-return {
-  accessToken,
-  refreshToken,
-  ...result,
-};
-
-  
+  return {
+    accessToken,
+    refreshToken,
+    ...result,
+  };
 };
 const forgetPassword = async (email: string) => {
   const isUserExist = await prisma.user.findUnique({
     where: {
-      email
-    }
+      email,
+    },
   });
   if (!isUserExist) {
     throw new AppError(status.NOT_FOUND, "user not found ");
-  };
+  }
   if (!isUserExist.emailVerified) {
     throw new AppError(status.BAD_REQUEST, "Email not verify");
-  };
-  if (isUserExist.isDeleted || isUserExist.status === USER_STATUS.BLOCK || isUserExist.status ===  USER_STATUS.DELETE) {
+  }
+  if (
+    isUserExist.isDeleted ||
+    isUserExist.status === USER_STATUS.BLOCK ||
+    isUserExist.status === USER_STATUS.DELETE
+  ) {
     throw new AppError(status.UNAUTHORIZED, "user is delete or  blocked");
-  };
+  }
   await auth.api.requestPasswordResetEmailOTP({
     body: {
       email,
-    }
-  })
-
-}
-const lotoutUser = async (sessionToken:string) => {
+    },
+  });
+};
+const lotoutUser = async (sessionToken: string) => {
   const result = await auth.api.signOut({
     headers: new Headers({
-      Authorization:`Bearer ${sessionToken}`
-    })
-  })
+      Authorization: `Bearer ${sessionToken}`,
+    }),
+  });
   return result;
-}
-const restPasswor =async (email: string, otp: string, newPassword: string)=>{
+};
+const restPasswor = async (email: string, otp: string, newPassword: string) => {
   const isUserExist = await prisma.user.findUnique({
     where: {
-      email
-    }
+      email,
+    },
   });
   if (!isUserExist) {
     throw new AppError(status.NOT_FOUND, "user not found");
-  };
-      if (!isUserExist.emailVerified) {
-        throw new AppError(status.BAD_REQUEST, "Email not verified");
-      }
+  }
+  if (!isUserExist.emailVerified) {
+    throw new AppError(status.BAD_REQUEST, "Email not verified");
+  }
 
-      if (isUserExist.isDeleted || isUserExist.status === USER_STATUS.DELETE) {
-        throw new AppError(status.NOT_FOUND, "User not found");
-  };
+  if (isUserExist.isDeleted || isUserExist.status === USER_STATUS.DELETE) {
+    throw new AppError(status.NOT_FOUND, "User not found");
+  }
   await auth.api.resetPasswordEmailOTP({
     body: {
       email,
       otp,
-      password:newPassword
-    }
-  })
+      password: newPassword,
+    },
+  });
   if (isUserExist.needPasswordChange) {
     await prisma.user.update({
       where: {
         id: isUserExist.id,
       },
       data: {
-        needPasswordChange: false
-      }
+        needPasswordChange: false,
+      },
     });
     await prisma.session.deleteMany({
       where: {
-        userId:isUserExist.id,
-      }
-    })
-}
-
-}
+        userId: isUserExist.id,
+      },
+    });
+  }
+};
 const getNewToken = async (refresToken: string, sessionToken: string) => {
   const isSessionTokenExist = await prisma.session.findFirst({
     where: {
-      token: sessionToken
+      token: sessionToken,
     },
     include: {
-      user: true
-    }
+      user: true,
+    },
   });
 
   if (!isSessionTokenExist) {
     throw new AppError(status.NOT_FOUND, "session not found ");
-  };
+  }
   const data = jwtUtils.verifyToken(refresToken, envVars.REFRESH_TOKEN_SECRET);
   if (!data.success && data.error) {
-    throw new AppError(status.NOT_FOUND, "token not found ")
+    throw new AppError(status.NOT_FOUND, "token not found ");
   }
-
 
   const newAccessToken = tokenUtils.getAccessToken({
     userId: data.user?.id,
@@ -272,53 +294,53 @@ const getNewToken = async (refresToken: string, sessionToken: string) => {
 
   const { token } = await prisma.session.update({
     where: {
-      token: sessionToken
+      token: sessionToken,
     },
     data: {
       token: sessionToken,
       expiresAt: new Date(Date.now() + 60 * 60 * 60 * 24 * 1000),
       updatedAt: new Date(),
-    }
-  })
+    },
+  });
 
   return {
     access_token: newAccessToken,
     refresh_token: newRefreshToken,
     session_token: token,
   };
-
 };
-const googleLoginSuccess = async (session : Record<string, any>) =>{
-    const accessToken = tokenUtils.getAccessToken({
-        userId: session.user.id,
-        role: session.user.role,
-        name: session.user.name,
-    });
+const googleLoginSuccess = async (session: Record<string, any>) => {
+  const accessToken = tokenUtils.getAccessToken({
+    userId: session.user.id,
+    role: session.user.role,
+    name: session.user.name,
+  });
 
-    const refreshToken = tokenUtils.getRefreshToken({
-        userId: session.user.id,
-        role: session.user.role,
-        name: session.user.name,
-    });
+  const refreshToken = tokenUtils.getRefreshToken({
+    userId: session.user.id,
+    role: session.user.role,
+    name: session.user.name,
+  });
 
-    return {
-        accessToken,
-        refreshToken,
-    }
-}
-const userUpdate = async (payload: IUserUpdatePayload, userInfo: IRequestUser) => {
+  return {
+    accessToken,
+    refreshToken,
+  };
+};
+const userUpdate = async (
+  payload: IUserUpdatePayload,
+  userInfo: IRequestUser,
+) => {
   const { userId, email } = userInfo;
   const updteUser = await prisma.user.update({
     where: {
       id: userId,
       email,
     },
-    data: payload
+    data: payload,
   });
   return updteUser;
 };
-
-
 export const authService = {
   userRegistation,
   userLogin,

@@ -20,4 +20,3 @@ model Payment {
   @@map("payments")
 }
 
-

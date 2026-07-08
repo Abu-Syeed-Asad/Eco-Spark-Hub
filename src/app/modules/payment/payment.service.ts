@@ -3,7 +3,10 @@ import { uploadFileToCloudinary } from "./../../config/cloudinary.config";
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import type Stripe from "stripe";
 import { prisma } from "../../lib/prisma";
-import { STRIPE_PAYMENT_STATUS } from "../../../generated/prisma/enums";
+import {
+  FINANCE_SOURCE,
+  STRIPE_PAYMENT_STATUS,
+} from "../../../generated/prisma/enums";
 import { generateInvoicePdf } from "./payment.utils";
 import type { IRequestUser } from "../../interface/IrequestUser.interface";
 import { sendEmail } from "../../utils/emailSend";
@@ -19,7 +22,7 @@ import {
 } from "./payment.constant";
 import { QueryBuilder } from "../../utils/QueryBuilder";
 
-const paymentHandler = async (event: Stripe.Event, user?: IRequestUser) => {
+const paymentHandler = async (event: Stripe.Event) => {
   const existingPayment = await prisma.payment.findFirst({
     where: {
       stripeEventId: event.id,
@@ -36,6 +39,24 @@ const paymentHandler = async (event: Stripe.Event, user?: IRequestUser) => {
       const session = event.data.object as any;
       const postId = session.metadata?.postId;
       const paymentId = session.metadata?.paymentId;
+      const ownerId = session.metadata?.ownerId;
+      const userId = session.metadata?.userId;
+      const currentUser = await prisma.user.findFirst({
+        where: {
+          id: userId,
+        },
+      });
+      if (!currentUser) {
+        throw new AppError(status.NOT_FOUND, "user not found ");
+      }
+      const postOwner = await prisma.user.findFirst({
+        where: {
+          id: ownerId,
+        },
+      });
+      if (!postOwner) {
+        throw new AppError(status.NOT_FOUND, "user not found ");
+      }
 
       if (!postId || !paymentId) {
         console.log(`Missing meta data `);
@@ -50,7 +71,7 @@ const paymentHandler = async (event: Stripe.Event, user?: IRequestUser) => {
       });
       if (!isPostExist) {
         console.error(
-          `⚠️ post ${postId} not found. Payment may be for expired post.`,
+          ` post ${postId} not found. Payment may be for expired post.`,
         );
         return { message: "Post not found" };
       }
@@ -70,8 +91,8 @@ const paymentHandler = async (event: Stripe.Event, user?: IRequestUser) => {
       }
 
       const paymentOwner = isPaymetExist.user;
-      const userName = paymentOwner?.name ?? user?.email ?? "Customer";
-      const userEmail = paymentOwner?.email ?? user?.email ?? "";
+      const userName = paymentOwner?.name ?? currentUser?.email ?? "Customer";
+      const userEmail = paymentOwner?.email ?? currentUser?.email ?? "";
 
       let invoiceUrl = null;
       let pdfBuffer: Buffer | null = null;
@@ -95,20 +116,58 @@ const paymentHandler = async (event: Stripe.Event, user?: IRequestUser) => {
           console.error("❌ Error generating/uploading invoice PDF:", pdfError);
         }
       }
-      const paymentUpdateConfrom = await prisma.payment.update({
-        where: {
-          id: paymentId,
-        },
-        data: {
-          status:
-            session.payment_status === "paid"
-              ? STRIPE_PAYMENT_STATUS.PAID
-              : STRIPE_PAYMENT_STATUS.UNPAID,
-          paymentGatewayData: session,
-          invoiceUrl: invoiceUrl,
-          stripeEventId: event.id,
-        },
+      const paymentTx = await prisma.$transaction(async (tx) => {
+        const paymentUpdateConfrom = await tx.payment.update({
+          where: {
+            id: paymentId,
+          },
+          data: {
+            status:
+              session.payment_status === "paid"
+                ? STRIPE_PAYMENT_STATUS.PAID
+                : STRIPE_PAYMENT_STATUS.UNPAID,
+            paymentGatewayData: session,
+            invoiceUrl: invoiceUrl,
+            stripeEventId: event.id,
+          },
+        });
+        const createFinanceLog = await tx.financeLog.create({
+          data: {
+            paymentId: paymentUpdateConfrom.id,
+            financeSource: FINANCE_SOURCE.POST,
+            userId: currentUser.id,
+            ownerId:postOwner.id,
+            amount: isPaymetExist.amount,
+          },
+        });
+
+        const reduceTakaInUser = await tx.user.update({
+          where: {
+            id: currentUser.id,
+          },
+          data: {
+            totalAmount: (Number(currentUser.totalAmount) -
+              Number(isPaymetExist.amount)) as number,
+          },
+        });
+        const IncriseTakaInOwner = await tx.user.update({
+          where: {
+            id: postOwner.id,
+          },
+          data: {
+            totalAmount: (Number(postOwner.totalAmount) +
+              Number(isPaymetExist.amount)) as number,
+          },
+        });
+
+        return {
+          paymentUpdateConfrom,
+          createFinanceLog,
+          reduceTakaInUser,
+          IncriseTakaInOwner,
+        };
       });
+
       if (session.payment_status === "paid" && invoiceUrl) {
         try {
           if (userEmail) {
@@ -131,11 +190,11 @@ const paymentHandler = async (event: Stripe.Event, user?: IRequestUser) => {
                 },
               ],
             });
-            console.log(`✅ Invoice email sent to ${userEmail}`);
+            
           }
           return {
             invoiceUrl,
-            paymentUpdateConfrom,
+            paymentTx,
           };
         } catch (error) {
           console.log(error);
@@ -174,7 +233,7 @@ const allPayment = async (query: IQueryParams) => {
     searchableFields: paymentSearcheblefields,
     filterableFields: paymentFilterableFields,
   });
- const result = await queryBuilder
+  const result = await queryBuilder
     .search()
     .filter()
     .where({ status: STRIPE_PAYMENT_STATUS.PAID })
@@ -182,9 +241,9 @@ const allPayment = async (query: IQueryParams) => {
       user: true,
       post: {
         include: {
-          category:true
-        }
-      }
+          category: true,
+        },
+      },
     })
     .dynamicInclude(paymentIncludeConfig)
     .pagination()
@@ -195,7 +254,7 @@ const allPayment = async (query: IQueryParams) => {
   // If result is a direct array of data:
   return result;
 };
-  
+
 const specificPayment = async (transectionId: string) => {
   const data = await prisma.payment.findFirst({
     where: {
@@ -261,7 +320,7 @@ const userSpecificPayment = async (id: string, user: IRequestUser) => {
 };
 const complitedAllPayment = async () => {
   const allPayment = await prisma.payment.findMany();
-}
+};
 export const paymentService = {
   paymentHandler,
   allPayment,
@@ -269,6 +328,5 @@ export const paymentService = {
   updatePayment,
   myAllPayment,
   userSpecificPayment,
-  complitedAllPayment
-  
+  complitedAllPayment,
 };

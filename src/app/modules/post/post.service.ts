@@ -50,7 +50,6 @@ const getAllPost = async (query: IQueryParams) => {
       category: true,
     })
     .execute();
- 
 
   return result;
 };
@@ -109,12 +108,21 @@ const deletePost = async (postId: string, user: IRequestUser) => {
   });
   return deletePost;
 };
-const specificPost = async (id: string, user: IRequestUser) => {
+const specificPost = async (postId: string, user: IRequestUser) => {
   const { userId, email } = user;
+  const isExistUser = await prisma.user.findFirst({
+    where: {
+      id: userId,
+      email,
+    },
+  });
+  if (!isExistUser) {
+    throw new AppError(status.NOT_FOUND,"user not found")
+  }
 
   const isExistPost = await prisma.post.findFirst({
     where: {
-      id,
+      id:postId,
     },
     include: {
       user: true,
@@ -125,17 +133,25 @@ const specificPost = async (id: string, user: IRequestUser) => {
   if (!isExistPost) {
     throw new AppError(
       status.NOT_FOUND,
-      `${id} is does not exist in database modle `,
+      `${postId} is does not exist in database modle `,
     );
+  }
+
+  if (isExistPost.userId === userId) {
+    return isExistPost;
   }
   if (isExistPost.postType === POST_TYPE.FREE) {
     return isExistPost;
+  }
+ 
+  if (Number(isExistPost.taka) > Number(isExistUser?.totalAmount)) {
+    return "your balance less then the post  ";
   }
 
   const checkPaymentByUser = await prisma.payment.findUnique({
     where: {
       userId: userId,
-      postId: id,
+      postId:isExistPost?.id,
     },
   });
   if (
@@ -146,11 +162,12 @@ const specificPost = async (id: string, user: IRequestUser) => {
   }
   if (!checkPaymentByUser) {
     const transactionId = randomUUID();
+
     const createPayment = await prisma.payment.create({
       data: {
         transactionId,
         amount: isExistPost.taka,
-        postId: id,
+        postId: isExistPost?.id,
         userId: userId,
       },
     });
@@ -170,8 +187,10 @@ const specificPost = async (id: string, user: IRequestUser) => {
         },
       ],
       metadata: {
-        postId: isExistPost.id,
         paymentId: createPayment.id,
+        postId: isExistPost.id,
+        ownerId: isExistPost.userId,
+        userId: isExistUser.id,
       },
       success_url: `${envVars.FRONTEND_URL}/dashboard/payment/payment-success`,
       cancel_url: `${envVars.FRONTEND_URL}`,
@@ -180,6 +199,7 @@ const specificPost = async (id: string, user: IRequestUser) => {
       paymentUrl: (await session).url,
       userEmail: email,
     };
+   
   } else if (
     checkPaymentByUser &&
     checkPaymentByUser.status === STRIPE_PAYMENT_STATUS.UNPAID
@@ -202,10 +222,13 @@ const specificPost = async (id: string, user: IRequestUser) => {
       metadata: {
         paymentId: checkPaymentByUser.id,
         postId: isExistPost.id,
+        ownerId: isExistPost.userId,
+        userId :isExistUser.id
       },
       success_url: `${envVars.FRONTEND_URL}/dashboard/payment/payment-success`,
       cancel_url: `${envVars.FRONTEND_URL}`,
     });
+  
     return {
       paymentUrl: session.url,
       userEmail: email,
@@ -408,11 +431,11 @@ const DashboardPost = async (user: IRequestUser) => {
         return {
           totalPost,
           allposts,
-           ApprovedPost,
+          ApprovedPost,
           countDraftedPost,
-           DraftedPost,
-           paidPost,
-           freePost,
+          DraftedPost,
+          paidPost,
+          freePost,
         };
       } catch (error) {
         console.log(error);

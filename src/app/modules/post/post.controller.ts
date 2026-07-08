@@ -60,6 +60,7 @@ const deletePost = catchAsync(async (req: Request, res: Response) => {
 const specificPost = catchAsync(async (req: Request, res: Response) => {
   const { id } = req.params;
   const user = req.user;
+
   const result = await postService.specificPost(id as string, user);
   sendRespose(res, {
     httpStatusCode: status.OK,

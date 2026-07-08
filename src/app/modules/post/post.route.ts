@@ -11,7 +11,7 @@ const router = Router();
 router.post(
   "/create",
   MulterUpload.single("photo"),
-  checkAuth(ROLE.USER),
+  checkAuth(ROLE.USER ,ROLE.ADMIN),
   zodSchemaRequestValidation(postSchema),
   postController.createPost,
 );
