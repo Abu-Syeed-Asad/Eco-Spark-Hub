@@ -5,6 +5,7 @@ import type Stripe from "stripe";
 import { prisma } from "../../lib/prisma";
 import {
   FINANCE_SOURCE,
+  NOTIFICATION_TYPE,
   STRIPE_PAYMENT_STATUS,
 } from "../../../generated/prisma/enums";
 import { generateInvoicePdf } from "./payment.utils";
@@ -21,6 +22,7 @@ import {
   paymentIncludeConfig,
 } from "./payment.constant";
 import { QueryBuilder } from "../../utils/QueryBuilder";
+import { NotificationService } from "../notification/notification.service";
 
 const paymentHandler = async (event: Stripe.Event) => {
   const existingPayment = await prisma.payment.findFirst({
@@ -113,7 +115,7 @@ const paymentHandler = async (event: Stripe.Event) => {
           );
           invoiceUrl = cloudinaryResponse.secure_url;
         } catch (pdfError) {
-          console.error("❌ Error generating/uploading invoice PDF:", pdfError);
+          console.error(" Error generating/uploading invoice PDF:", pdfError);
         }
       }
       const paymentTx = await prisma.$transaction(async (tx) => {
@@ -199,6 +201,41 @@ const paymentHandler = async (event: Stripe.Event) => {
         } catch (error) {
           console.log(error);
         }
+      }
+      if (session.payment_status === "paid") {
+        await Promise.all([
+          await NotificationService.createNotification({
+            recipientId: currentUser.id,
+
+            senderId: postOwner.id,
+
+            title: "Payment Successful",
+
+            message: `Your payment for "${isPostExist.title}" completed successfully.`,
+
+            type: NOTIFICATION_TYPE.PAYMENT_SUCCESS,
+
+            entityId: paymentId,
+
+            entityType: "PAYMENT",
+          }),
+
+          await NotificationService.createNotification({
+            recipientId: postOwner.id,
+
+            senderId: currentUser.id,
+
+            title: "New Payment Received",
+
+            message: `${currentUser.name} purchased your post "${isPostExist.title}".`,
+
+            type: NOTIFICATION_TYPE.PAYMENT_SUCCESS,
+
+            entityId: paymentId,
+
+            entityType: "PAYMENT",
+          }),
+        ]);
       }
       break;
     }

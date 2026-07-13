@@ -1,10 +1,27 @@
-model notifications {
-  id        String   @id @default(ulid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id])
-  title     String
-  message   String
-  isRead    Boolean  @default(false)
+model Notification {
+  id String @id @default(uuid())
+
+  recipientId String
+  senderId    String?
+
+  title   String
+  message String
+
+  type NOTIFICATION_TYPE
+
+  entityId   String?
+  entityType String?
+
+  isRead Boolean @default(false)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  recipient User @relation("NotificationRecipient", fields: [recipientId], references: [id])
+
+  sender User? @relation("NotificationSender", fields: [senderId], references: [id])
+
+  @@index([recipientId])
+  @@index([isRead])
+  @@map("notifications")
 }

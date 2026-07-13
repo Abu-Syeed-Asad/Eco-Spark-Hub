@@ -14,13 +14,15 @@ model User {
   updatedAt          DateTime    @updatedAt
   totalAmount        Float       @default(0)
 
-  sessions      Session[]
-  accounts      Account[]
-  posts         Post[]
-  comments      Comment[]
-  payments      Payment[]
-  reports       report[]
-  notifications notifications[]
+  sessions Session[]
+  accounts Account[]
+  posts    Post[]
+  comments Comment[]
+  payments Payment[]
+  reports  report[]
+
+  receivedNotifications Notification[] @relation("NotificationRecipient")
+  sentNotifications     Notification[] @relation("NotificationSender")
 
   financeLogs      FinanceLog[] @relation("UserFinanceLogs")
   ownedFinanceLogs FinanceLog[] @relation("OwnerFinanceLogs")

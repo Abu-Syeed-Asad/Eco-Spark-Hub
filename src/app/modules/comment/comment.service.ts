@@ -4,12 +4,32 @@ import type { IRequestUser } from "../../interface/IrequestUser.interface"
 import { prisma } from "../../lib/prisma"
 
 import type { IComment, IupdateComment } from "./comment.interface"
-import { ROLE } from "../../../generated/prisma/enums"
+import { NOTIFICATION_TYPE, ROLE } from "../../../generated/prisma/enums"
+import { NotificationService } from "../notification/notification.service"
 
 const commentCreate = async (paylaod: IComment) => {
   const comment = await prisma.comment.create({
-    data:paylaod,
+    data: paylaod,
+    include: {
+      user: true,
+      post:true,
+    }
   })
+     await NotificationService.createNotification({
+       recipientId: comment.post.userId,
+
+       senderId: comment.userId,
+
+       title: "New Comment",
+
+       message: `${comment.user.name} commented on your post`,
+
+       type: NOTIFICATION_TYPE.COMMENT,
+
+       entityId: comment.id,
+
+       entityType: "COMMENT",
+     });
   return comment
 }
 const showComment = async (PsotId :string) => {
@@ -36,13 +56,33 @@ const commentUpdate = async (commentId: string, userInfo: IRequestUser, updateCo
     throw new AppError(status.NOT_FOUND, "this comment not exist in the database");
   }
   if (isExistcomment || userInfo.role === ROLE.ADMIN) {
-    const conment_update = await prisma.comment.update({
+    const comment_update = await prisma.comment.update({
       where: {
         id: commentId,
       },
       data: updateComment,
+      include: {
+        user: true,
+        post: true,
+      },
     });
-    return conment_update;
+    await NotificationService.createNotification({
+      recipientId: comment_update.post.userId,
+
+      senderId: comment_update.userId,
+
+      title: "Comment Updated",
+
+      message: `${comment_update.user.name} updated a comment on your post`,
+
+      type: NOTIFICATION_TYPE.COMMENT,
+
+      entityId: comment_update.id,
+
+      entityType: "COMMENT",
+    });
+
+    return comment_update;
   }
 
 }
