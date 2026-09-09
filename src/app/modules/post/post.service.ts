@@ -247,6 +247,9 @@ const DashboardPost = async (user: IRequestUser) => {
             where: {
               userId,
             },
+            include: {
+              category:true,
+            }
           }),
           tx.post.count({
             where: {
@@ -260,6 +263,9 @@ const DashboardPost = async (user: IRequestUser) => {
               status: POST_STATUS.APPROVED,
               userId,
             },
+            include: {
+              category:true,
+            }
           }),
           tx.post.count({
             where: {
@@ -275,6 +281,9 @@ const DashboardPost = async (user: IRequestUser) => {
               userId,
               status: POST_STATUS.REJECTED,
             },
+            include: {
+              category:true
+            }
           }),
           tx.post.count({
             where: {
@@ -290,6 +299,9 @@ const DashboardPost = async (user: IRequestUser) => {
               userId,
               status: POST_STATUS.DRAFT,
             },
+            include: {
+              category:true
+            }
           }),
           tx.post.count({
             where: {
@@ -390,14 +402,10 @@ const DashboardPost = async (user: IRequestUser) => {
       try {
         const [allposts, totalPost] = await Promise.all([
           tx.post.findMany({
-            where: {
-              userId,
-            },
+            
           }),
           tx.post.count({
-            where: {
-              userId,
-            },
+          
           }),
         ]);
         const ApprovedPost = await tx.post.count({
@@ -410,6 +418,10 @@ const DashboardPost = async (user: IRequestUser) => {
             where: {
               status: POST_STATUS.DRAFT,
             },
+            include: {
+              category:true
+            }
+            
           }),
           tx.post.count({
             where: {
@@ -490,3 +502,4 @@ export const postService = {
   DashboardPost,
   postUpdateByadmin,
 };
+

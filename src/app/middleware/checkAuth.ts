@@ -22,7 +22,7 @@ export const checkAuth =
             token: sessionToken,
             expiresAt: {
               gt: new Date(),
-            },
+            },                                      
           },
           include: {
             user: true,

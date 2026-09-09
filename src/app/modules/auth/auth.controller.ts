@@ -1,4 +1,3 @@
-
 import type { Request, Response } from "express";
 import { catchAsync } from "../../shared/catchAsync";
 import { authService } from "./auth.service";
@@ -38,17 +37,18 @@ const userLogin = catchAsync(async (req: Request, res: Response) => {
 });
 const getMe = catchAsync(async (req: Request, res: Response) => {
   const user = req.user;
+
   if (!user) {
     throw new AppError(status.NOT_FOUND, "user note found here");
-  };
-  const userInfo =await authService.getMe(user);
-  sendRespose(res, ({
+  }
+  const userInfo = await authService.getMe(user);
+  sendRespose(res, {
     httpStatusCode: status.OK,
     success: true,
     message: "Here are User information",
-    data:userInfo
-  }))
-})
+    data: userInfo,
+  });
+});
 const verifyEmail = catchAsync(async (req: Request, res: Response) => {
   const { email, otp } = req.body;
   const result = await authService.verifiyEmail(email, otp);
@@ -59,47 +59,58 @@ const verifyEmail = catchAsync(async (req: Request, res: Response) => {
     data: result,
   });
 });
+const resendVerify = catchAsync(async (req: Request, res: Response) => {
+  const { email } = req.body;
+  console.log(email);
+  const result = await authService.resendVerifyEmail(email);
+  sendRespose(res, {
+    httpStatusCode: status.OK,
+    success: true,
+    message: "verification otp resent successfully",
+    data: result,
+  });
+});
 const changePassword = catchAsync(async (req: Request, res: Response) => {
   const payload = req.body;
-  const sessionToken = req.cookies['session_token'];
-  const result = await authService.changePassword(payload, sessionToken)
-    tokenUtils.setAccessTokenInCookie(res, result.accessToken);
-    tokenUtils.setRefreshTokenInCookie(res, result.refreshToken);
-    tokenUtils.setSessionTokenInCookie(res, result.token as string);
+  const sessionToken = req.cookies["session_token"];
+  const result = await authService.changePassword(payload, sessionToken);
+  tokenUtils.setAccessTokenInCookie(res, result.accessToken);
+  tokenUtils.setRefreshTokenInCookie(res, result.refreshToken);
+  tokenUtils.setSessionTokenInCookie(res, result.token as string);
   sendRespose(res, {
     httpStatusCode: status.OK,
     success: true,
     message: "password change endpoint reached",
-    data:result,
+    data: result,
   });
 });
 const lotoutUser = catchAsync(async (req: Request, res: Response) => {
-  const session = cookieUtils.getCookie(req, 'session_token');
+  const session = cookieUtils.getCookie(req, "session_token");
   const result = await authService.lotoutUser(session);
-  
+
   cookieUtils.cleareCookie(res, "session_token", {
     httpOnly: true,
     secure: true,
-    sameSite: 'none'
+    sameSite: "none",
   });
   cookieUtils.cleareCookie(res, "access_token", {
     httpOnly: true,
     secure: true,
-    sameSite: 'none'
+    sameSite: "none",
   });
   cookieUtils.cleareCookie(res, "refresh_token", {
     httpOnly: true,
     secure: true,
-    sameSite: 'none'
+    sameSite: "none",
   });
 
-  sendRespose(res, ({
+  sendRespose(res, {
     httpStatusCode: status.OK,
     success: true,
     message: "successfully log-out usr",
-    data:result
-  }))
-})
+    data: result,
+  });
+});
 const forgetPassword = catchAsync(async (req: Request, res: Response) => {
   const { email } = req.body;
   await authService.forgetPassword(email);
@@ -107,32 +118,37 @@ const forgetPassword = catchAsync(async (req: Request, res: Response) => {
     httpStatusCode: status.OK,
     success: true,
     message: "Password reset otp sent in your mail",
-    
-  })
+  });
 });
 const resetPassword = catchAsync(async (req: Request, res: Response) => {
-  
-  const {email,otp,newPassword} = req.body;
+  const { email, otp, newPassword } = req.body;
   await authService.restPasswor(email, otp, newPassword);
   sendRespose(res, {
     httpStatusCode: status.OK,
     message: "successfully reset password",
-    success:true
-  })
-})
+    success: true,
+  });
+});
 const userUpdate = catchAsync(async (req: Request, res: Response) => {
-  
-  const userInfo = req.body;
-  const payload = req.body;
-  const data= await authService.userUpdate(payload,userInfo);
+  const userInfo = req.user;
+
+  if (!userInfo) {
+    throw new AppError(status.UNAUTHORIZED, "User not authenticated");
+  }
+
+  const payload = {
+    ...req.body,
+    image: req.file?.path || req.file?.filename || req.body.image,
+  };
+
+  const data = await authService.userUpdate(payload, userInfo);
   sendRespose(res, {
     httpStatusCode: status.OK,
-    message: "successfully reset password",
+    message: "successfully updated profile",
     success: true,
-    data
-    
-  })
-})
+    data,
+  });
+});
 const getNewToken = catchAsync(async (req: Request, res: Response) => {
   const refreshToken = req.cookies.refresh_token;
   const betterAuthSessionToken = req.cookies["session_token"];
@@ -163,63 +179,73 @@ const getNewToken = catchAsync(async (req: Request, res: Response) => {
 });
 // /api/v1/auth/login/google?redirect=/profile
 const googleLogin = catchAsync((req: Request, res: Response) => {
-    const redirectPath = req.query.redirect || "/dashboard";
+  const redirectPath = req.query.redirect || "/dashboard";
 
-    const encodedRedirectPath = encodeURIComponent(redirectPath as string);
+  const encodedRedirectPath = encodeURIComponent(redirectPath as string);
 
-    const callbackURL = `${envVars.BETTER_AUTH_URL}/api/v1/auth/google/success?redirect=${encodedRedirectPath}`;
+  const callbackURL = `${envVars.BETTER_AUTH_URL}/api/v1/auth/google/success?redirect=${encodedRedirectPath}`;
 
-    res.render("googleRedirect", {
-        callbackURL : callbackURL,
-        betterAuthUrl : envVars.BETTER_AUTH_URL,
-    })
-})
+  res.render("googleRedirect", {
+    callbackURL: callbackURL,
+    betterAuthUrl: envVars.BETTER_AUTH_URL,
+  });
+});
 
 const googleLoginSuccess = catchAsync(async (req: Request, res: Response) => {
-    const redirectPath = req.query.redirect as string || "/dashboard";
+  const redirectPath = (req.query.redirect as string) || "/dashboard";
 
-    const sessionToken = req.cookies["better-auth.session_token"];
+  const sessionToken = req.cookies["better-auth.session_token"];
 
-    if(!sessionToken){
-        return res.redirect(`${envVars.FRONTEND_URL}/login?error=oauth_failed`);
-    }
+  if (!sessionToken) {
+    return res.redirect(`${envVars.FRONTEND_URL}/login?error=oauth_failed`);
+  }
 
-    const session = await auth.api.getSession({
-        headers:{
-            "Cookie" : `better-auth.session_token=${sessionToken}`
-        }
-    })
+  const session = await auth.api.getSession({
+    headers: {
+      Cookie: `better-auth.session_token=${sessionToken}`,
+    },
+  });
 
-    if (!session) {
-        return res.redirect(`${envVars.FRONTEND_URL}/login?error=no_session_found`);
-    }
+  if (!session) {
+    return res.redirect(`${envVars.FRONTEND_URL}/login?error=no_session_found`);
+  }
 
+  if (session && !session.user) {
+    return res.redirect(`${envVars.FRONTEND_URL}/login?error=no_user_found`);
+  }
 
-    if(session && !session.user){
-        return res.redirect(`${envVars.FRONTEND_URL}/login?error=no_user_found`);
-    }
+  const result = await authService.googleLoginSuccess(session);
 
-    const result = await authService.googleLoginSuccess(session);
+  const { accessToken, refreshToken } = result;
 
-    const {accessToken, refreshToken} = result;
+  tokenUtils.setAccessTokenInCookie(res, accessToken);
+  tokenUtils.setRefreshTokenInCookie(res, refreshToken);
+  // ?redirect=//profile -> /profile
+  const isValidRedirectPath =
+    redirectPath.startsWith("/") && !redirectPath.startsWith("//");
+  const finalRedirectPath = isValidRedirectPath ? redirectPath : "/dashboard";
 
-    tokenUtils.setAccessTokenInCookie(res, accessToken);
-    tokenUtils.setRefreshTokenInCookie(res, refreshToken);
- // ?redirect=//profile -> /profile
-    const isValidRedirectPath = redirectPath.startsWith("/") && !redirectPath.startsWith("//");
-    const finalRedirectPath = isValidRedirectPath ? redirectPath : "/dashboard";
-
-    res.redirect(`${envVars.FRONTEND_URL}${finalRedirectPath}`);
-})
+  res.redirect(`${envVars.FRONTEND_URL}${finalRedirectPath}`);
+});
 
 const handleOAuthError = catchAsync((req: Request, res: Response) => {
-    const error = req.query.error as string || "oauth_failed";
-    res.redirect(`${envVars.FRONTEND_URL}/login?error=${error}`);
-})
+  const error = (req.query.error as string) || "oauth_failed";
+  res.redirect(`${envVars.FRONTEND_URL}/login?error=${error}`);
+});
+const allUser = catchAsync(async (req: Request, res: Response) => {
+  const data = await authService.allUserFromService();
+  sendRespose(res, {
+    httpStatusCode: status.OK,
+    success: true,
+    message: "All user",
+    data,
+  });
+});
 export const authController = {
   userLogin,
   userRegistation,
   verifyEmail,
+  resendVerify,
   changePassword,
   getMe,
   lotoutUser,
@@ -230,6 +256,5 @@ export const authController = {
   googleLoginSuccess,
   handleOAuthError,
   userUpdate,
-  
-
+  allUser,
 };

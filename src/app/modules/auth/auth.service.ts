@@ -112,16 +112,18 @@ const getMe = async (payload: IRequestUser) => {
   return isExist;
 };
 const verifiyEmail = async (email: string, otp: string) => {
+  const normalizedEmail = email.trim().toLowerCase();
+  const normalizedOtp = otp.trim();
   const result = await auth.api.verifyEmailOTP({
     body: {
-      email,
-      otp,
+      email: normalizedEmail,
+      otp: normalizedOtp,
     },
   });
   if (result.status && !result.user.emailVerified) {
     await prisma.user.update({
       where: {
-        email,
+        email: normalizedEmail,
       },
       data: {
         emailVerified: true,
@@ -130,6 +132,26 @@ const verifiyEmail = async (email: string, otp: string) => {
   }
   return result;
 };
+
+const resendVerifyEmail = async (email: string) => {
+  const normalizedEmail = email.trim().toLowerCase();
+  const user = await prisma.user.findUnique({
+    where: { email: normalizedEmail },
+  });
+  if (!user) {
+    throw new AppError(status.NOT_FOUND, "user not found");
+  }
+  if (user.emailVerified) {
+    throw new AppError(status.BAD_REQUEST, "Email already verified");
+  }
+
+  const result = await auth.api.sendVerificationOTP({
+    body: { email: normalizedEmail, type: "email-verification" },
+  });
+
+  return result;
+};
+
 const changePassword = async (
   payload: IChangePassword,
   sessionToken: string,
@@ -183,27 +205,28 @@ const changePassword = async (
   };
 };
 const forgetPassword = async (email: string) => {
+  const normalizedEmail = email.trim().toLowerCase();
   const isUserExist = await prisma.user.findUnique({
     where: {
-      email,
+      email: normalizedEmail,
     },
   });
   if (!isUserExist) {
-    throw new AppError(status.NOT_FOUND, "user not found ");
+    throw new AppError(status.NOT_FOUND, "user not found");
   }
   if (!isUserExist.emailVerified) {
-    throw new AppError(status.BAD_REQUEST, "Email not verify");
+    throw new AppError(status.BAD_REQUEST, "Email not verified");
   }
   if (
     isUserExist.isDeleted ||
     isUserExist.status === USER_STATUS.BLOCK ||
     isUserExist.status === USER_STATUS.DELETE
   ) {
-    throw new AppError(status.UNAUTHORIZED, "user is delete or  blocked");
+    throw new AppError(status.UNAUTHORIZED, "user is deleted or blocked");
   }
   await auth.api.requestPasswordResetEmailOTP({
     body: {
-      email,
+      email: normalizedEmail,
     },
   });
 };
@@ -215,10 +238,13 @@ const lotoutUser = async (sessionToken: string) => {
   });
   return result;
 };
+
 const restPasswor = async (email: string, otp: string, newPassword: string) => {
+  const normalizedEmail = email.trim().toLowerCase();
+  const normalizedOtp = otp.trim();
   const isUserExist = await prisma.user.findUnique({
     where: {
-      email,
+      email: normalizedEmail,
     },
   });
   if (!isUserExist) {
@@ -231,13 +257,18 @@ const restPasswor = async (email: string, otp: string, newPassword: string) => {
   if (isUserExist.isDeleted || isUserExist.status === USER_STATUS.DELETE) {
     throw new AppError(status.NOT_FOUND, "User not found");
   }
-  await auth.api.resetPasswordEmailOTP({
-    body: {
-      email,
-      otp,
-      password: newPassword,
-    },
-  });
+  try {
+    await auth.api.resetPasswordEmailOTP({
+      body: {
+        email: normalizedEmail,
+        otp: normalizedOtp,
+        password: newPassword,
+      },
+    });
+  } catch (error) {
+    throw new AppError(status.UNAUTHORIZED, "resetpassword error");
+  }
+
   if (isUserExist.needPasswordChange) {
     await prisma.user.update({
       where: {
@@ -331,7 +362,12 @@ const userUpdate = async (
   payload: IUserUpdatePayload,
   userInfo: IRequestUser,
 ) => {
+  if (!userInfo?.userId || !userInfo?.email) {
+    throw new AppError(status.UNAUTHORIZED, "User not authenticated");
+  }
+
   const { userId, email } = userInfo;
+
   const updteUser = await prisma.user.update({
     where: {
       id: userId,
@@ -341,6 +377,11 @@ const userUpdate = async (
   });
   return updteUser;
 };
+const allUserFromService = async () => {
+  const data = prisma.user.findMany();
+  return data;
+};
+
 export const authService = {
   userRegistation,
   userLogin,
@@ -350,7 +391,9 @@ export const authService = {
   lotoutUser,
   forgetPassword,
   restPasswor,
+  resendVerifyEmail,
   getNewToken,
   googleLoginSuccess,
   userUpdate,
+  allUserFromService,
 };

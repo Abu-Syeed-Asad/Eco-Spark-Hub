@@ -22,6 +22,7 @@ const createPost = catchAsync(async (req: Request, res: Response) => {
 const getallPost = catchAsync(async (req: Request, res: Response) => {
   const query = req.query;
   const result = await postService.getAllPost(query as IQueryParams);
+
   sendRespose(res, {
     success: true,
     httpStatusCode: status.OK,

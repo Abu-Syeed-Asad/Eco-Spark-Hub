@@ -17,6 +17,6 @@ export interface IChangePassword {
 
 export interface IUserUpdatePayload {
   name?: string;
-  pnone?: string;
+  phone?: string;
   image?: string;
 }

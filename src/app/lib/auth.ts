@@ -166,7 +166,7 @@ export const auth = betterAuth({
       },
 
       sendVerificationOnSignUp: true,
-      expiresIn: 2 * 60,
+      expiresIn: 30 * 60,
       otpLength: 6,
     }),
   ],
