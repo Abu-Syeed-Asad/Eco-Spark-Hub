@@ -1,4 +1,3 @@
-
 import type {
   IQueryConfig,
   IQueryParams,
@@ -11,7 +10,6 @@ import type {
   PrismaWhereConditions,
 } from "../interface/queryBuilder.interface";
 
-
 export class QueryBuilder<
   T,
   TWhereInpute = Record<string, unknown>,
@@ -20,7 +18,7 @@ export class QueryBuilder<
   private query: PrismaFindManyArgs;
   private counntQuery: PrismaCountArgs;
   private page: number = 1;
-  private limit: number = 10;
+  private limit: number = 0;
   private skip: number = 0;
   private sortBy: string = "createdAt";
   private sortOrder: "asc" | "desc" = "desc";
@@ -65,8 +63,6 @@ export class QueryBuilder<
       where: {},
       include: {},
       orderBy: {},
-      skip: 0,
-      take: 10,
     };
     this.counntQuery = {
       where: {},
@@ -416,12 +412,17 @@ export class QueryBuilder<
         this.query as Parameters<typeof this.model.findMany>[0],
       ),
     ]);
-    const totalPages = Math.ceil(total / this.limit);
+    const limit = this.limit || total;
+    const totalPages = this.limit
+      ? Math.ceil(total / this.limit)
+      : total > 0
+        ? 1
+        : 0;
     return {
       data: data as T[],
       meta: {
         page: this.page,
-        limit: this.limit,
+        limit,
         total,
         totalPages,
       },

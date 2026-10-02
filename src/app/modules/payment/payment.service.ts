@@ -138,7 +138,7 @@ const paymentHandler = async (event: Stripe.Event) => {
             paymentId: paymentUpdateConfrom.id,
             financeSource: FINANCE_SOURCE.POST,
             userId: currentUser.id,
-            ownerId:postOwner.id,
+            ownerId: postOwner.id,
             amount: isPaymetExist.amount,
           },
         });
@@ -192,7 +192,6 @@ const paymentHandler = async (event: Stripe.Event) => {
                 },
               ],
             });
-            
           }
           return {
             invoiceUrl,
@@ -270,10 +269,11 @@ const allPayment = async (query: IQueryParams) => {
     searchableFields: paymentSearcheblefields,
     filterableFields: paymentFilterableFields,
   });
-  const result = await queryBuilder
-    .search()
-    .filter()
-    .where({ status: STRIPE_PAYMENT_STATUS.PAID })
+  const paymentQuery = queryBuilder.search().filter();
+  if (query.page || query.limit) {
+    paymentQuery.pagination();
+  }
+  const result = await paymentQuery
     .include({
       user: true,
       post: {
@@ -283,7 +283,6 @@ const allPayment = async (query: IQueryParams) => {
       },
     })
     .dynamicInclude(paymentIncludeConfig)
-    .pagination()
     .sort()
     .fields()
     .execute();

@@ -39,11 +39,14 @@ const getAllPost = async (query: IQueryParams) => {
     searchableFields: postSearchableFields,
     filterableFields: postFilterableFields,
   });
-  const result = await queryBuilder
+  const filteredQuery = queryBuilder
     .where({ status: POST_STATUS.APPROVED })
     .search()
-    .filter()
-    .pagination()
+    .filter();
+  if (query.page || query.limit) {
+    filteredQuery.pagination();
+  }
+  const result = await filteredQuery
     .sort()
     .include({
       user: true,
