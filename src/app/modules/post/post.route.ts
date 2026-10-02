@@ -11,7 +11,7 @@ const router = Router();
 router.post(
   "/create",
   MulterUpload.single("photo"),
-  checkAuth(ROLE.USER ,ROLE.ADMIN),
+  checkAuth(ROLE.USER, ROLE.ADMIN),
   zodSchemaRequestValidation(postSchema),
   postController.createPost,
 );
@@ -20,11 +20,15 @@ router.get("/dashbord-post", checkAuth(), postController.dashbordPost);
 router.patch(
   "/update/:id",
   MulterUpload.single("photo"),
+  checkAuth(ROLE.USER, ROLE.ADMIN),
   postController.updatePost,
 );
-router.delete("/:id", postController.deletePost);
+router.delete(
+  "/delete/:id",
+  checkAuth(ROLE.USER, ROLE.ADMIN),
+  postController.deletePost,
+);
 
 router.get("/:id", checkAuth(), postController.specificPost);
-
 
 export const postRouter: Router = router;

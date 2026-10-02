@@ -53,16 +53,21 @@ const getAllPost = async (query: IQueryParams) => {
 
   return result;
 };
-const updatePost = async (payload: IIUpdatePostInterface, postId: string) => {
-  const isExistPost = await prisma.post.findUnique({
+const updatePost = async (
+  payload: IIUpdatePostInterface,
+  postId: string,
+  user: IRequestUser,
+) => {
+  const isExistPost = await prisma.post.findFirst({
     where: {
       id: postId,
+      ...(user.role === ROLE.ADMIN ? {} : { userId: user.userId }),
     },
   });
   if (!isExistPost) {
     throw new AppError(status.NOT_FOUND, "post not found ");
   }
-  if (isExistPost.status === POST_STATUS.APPROVED) {
+  if (user.role !== ROLE.ADMIN && isExistPost.status === POST_STATUS.APPROVED) {
     throw new AppError(
       status.BAD_REQUEST,
       "Your post is Already Approved so you can not change ",
@@ -94,35 +99,21 @@ const deletePost = async (postId: string, user: IRequestUser) => {
   const postExist = await prisma.post.findFirst({
     where: {
       id: postId,
-      userId: user.userId,
+      ...(user.role === ROLE.ADMIN ? {} : { userId: user.userId }),
     },
   });
   if (!postExist) {
     throw new AppError(status.NOT_FOUND, "post not found ");
   }
-  const deletePost = await prisma.post.delete({
-    where: {
-      id: postId,
-      userId: user.userId,
-    },
-  });
+  const deletePost = await prisma.post.delete({ where: { id: postId } });
   return deletePost;
 };
 const specificPost = async (postId: string, user: IRequestUser) => {
-  const { userId, email } = user;
-  const isExistUser = await prisma.user.findFirst({
-    where: {
-      id: userId,
-      email,
-    },
-  });
-  if (!isExistUser) {
-    throw new AppError(status.NOT_FOUND,"user not found")
-  }
+  const { userId, email, role } = user;
 
   const isExistPost = await prisma.post.findFirst({
     where: {
-      id:postId,
+      id: postId,
     },
     include: {
       user: true,
@@ -137,21 +128,34 @@ const specificPost = async (postId: string, user: IRequestUser) => {
     );
   }
 
-  if (isExistPost.userId === userId) {
+  if (
+    role === ROLE.ADMIN ||
+    isExistPost.userId === userId ||
+    isExistPost.postType === POST_TYPE.FREE
+  ) {
     return isExistPost;
   }
-  if (isExistPost.postType === POST_TYPE.FREE) {
-    return isExistPost;
+
+  const isExistUser = await prisma.user.findFirst({
+    where: {
+      id: userId,
+      email,
+    },
+  });
+  if (!isExistUser) {
+    throw new AppError(status.NOT_FOUND, "user not found");
   }
- 
+
   if (Number(isExistPost.taka) > Number(isExistUser?.totalAmount)) {
     return "your balance less then the post  ";
   }
 
   const checkPaymentByUser = await prisma.payment.findUnique({
     where: {
-      userId: userId,
-      postId:isExistPost?.id,
+      userId_postId: {
+        userId,
+        postId: isExistPost.id,
+      },
     },
   });
   if (
@@ -199,7 +203,6 @@ const specificPost = async (postId: string, user: IRequestUser) => {
       paymentUrl: (await session).url,
       userEmail: email,
     };
-   
   } else if (
     checkPaymentByUser &&
     checkPaymentByUser.status === STRIPE_PAYMENT_STATUS.UNPAID
@@ -223,12 +226,12 @@ const specificPost = async (postId: string, user: IRequestUser) => {
         paymentId: checkPaymentByUser.id,
         postId: isExistPost.id,
         ownerId: isExistPost.userId,
-        userId :isExistUser.id
+        userId: isExistUser.id,
       },
       success_url: `${envVars.FRONTEND_URL}/dashboard/payment/payment-success`,
       cancel_url: `${envVars.FRONTEND_URL}`,
     });
-  
+
     return {
       paymentUrl: session.url,
       userEmail: email,
@@ -248,8 +251,8 @@ const DashboardPost = async (user: IRequestUser) => {
               userId,
             },
             include: {
-              category:true,
-            }
+              category: true,
+            },
           }),
           tx.post.count({
             where: {
@@ -264,8 +267,8 @@ const DashboardPost = async (user: IRequestUser) => {
               userId,
             },
             include: {
-              category:true,
-            }
+              category: true,
+            },
           }),
           tx.post.count({
             where: {
@@ -282,8 +285,8 @@ const DashboardPost = async (user: IRequestUser) => {
               status: POST_STATUS.REJECTED,
             },
             include: {
-              category:true
-            }
+              category: true,
+            },
           }),
           tx.post.count({
             where: {
@@ -300,8 +303,8 @@ const DashboardPost = async (user: IRequestUser) => {
               status: POST_STATUS.DRAFT,
             },
             include: {
-              category:true
-            }
+              category: true,
+            },
           }),
           tx.post.count({
             where: {
@@ -401,12 +404,8 @@ const DashboardPost = async (user: IRequestUser) => {
     const adminDashboardPost = await prisma.$transaction(async (tx) => {
       try {
         const [allposts, totalPost] = await Promise.all([
-          tx.post.findMany({
-            
-          }),
-          tx.post.count({
-          
-          }),
+          tx.post.findMany({}),
+          tx.post.count({}),
         ]);
         const ApprovedPost = await tx.post.count({
           where: {
@@ -419,9 +418,8 @@ const DashboardPost = async (user: IRequestUser) => {
               status: POST_STATUS.DRAFT,
             },
             include: {
-              category:true
-            }
-            
+              category: true,
+            },
           }),
           tx.post.count({
             where: {
@@ -502,4 +500,3 @@ export const postService = {
   DashboardPost,
   postUpdateByadmin,
 };
-

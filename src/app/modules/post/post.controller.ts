@@ -1,4 +1,3 @@
-
 import type { Request, Response } from "express";
 import { postService } from "./post.service";
 import { catchAsync } from "../../shared/catchAsync";
@@ -28,7 +27,7 @@ const getallPost = catchAsync(async (req: Request, res: Response) => {
     httpStatusCode: status.OK,
     message: "all post ",
     data: result.data,
-    meta:result.meta,
+    meta: result.meta,
   });
 });
 const updatePost = catchAsync(async (req: Request, res: Response) => {
@@ -38,7 +37,7 @@ const updatePost = catchAsync(async (req: Request, res: Response) => {
   };
   const { id } = req.params;
   console.log(id);
-  const result = await postService.updatePost(payload, id as string);
+  const result = await postService.updatePost(payload, id as string, req.user);
   sendRespose(res, {
     httpStatusCode: status.OK,
     success: true,
@@ -48,9 +47,9 @@ const updatePost = catchAsync(async (req: Request, res: Response) => {
 });
 const deletePost = catchAsync(async (req: Request, res: Response) => {
   const { id } = req.params;
-  const user=req.user
+  const user = req.user;
   console.log(id);
-  const result = await postService.deletePost(id as string,user);
+  const result = await postService.deletePost(id as string, user);
   sendRespose(res, {
     httpStatusCode: status.OK,
     success: true,
@@ -84,7 +83,7 @@ const postUpdateByadmin = catchAsync(async (req: Request, res: Response) => {
   const { postId, post_status } = req.query;
   const updateStatus = await postService.postUpdateByadmin(
     postId as string,
-    post_status as POST_STATUS
+    post_status as POST_STATUS,
   );
 
   sendRespose(res, {
