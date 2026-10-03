@@ -149,10 +149,6 @@ const specificPost = async (postId: string, user: IRequestUser) => {
     throw new AppError(status.NOT_FOUND, "user not found");
   }
 
-  if (Number(isExistPost.taka) > Number(isExistUser?.totalAmount)) {
-    return "your balance less then the post  ";
-  }
-
   const checkPaymentByUser = await prisma.payment.findUnique({
     where: {
       userId_postId: {
@@ -231,7 +227,7 @@ const specificPost = async (postId: string, user: IRequestUser) => {
         ownerId: isExistPost.userId,
         userId: isExistUser.id,
       },
-      success_url: `${envVars.FRONTEND_URL}/dashboard/payment/payment-success`,
+      success_url: `${envVars.FRONTEND_URL}/dashboard/user/payment`,
       cancel_url: `${envVars.FRONTEND_URL}`,
     });
 
