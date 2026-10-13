@@ -3,6 +3,8 @@ import { Router } from "express";
 import { authController } from "./auth.controller";
 import { ROLE } from "../../../generated/prisma/enums";
 import { MulterUpload } from "../../config/multer.config";
+import { zodSchemaRequestValidation } from "../../middleware/RequestZodvalidation";
+import { adminUserUpdateSchema } from "./auth.zodSchema";
 
 const router = Router();
 
@@ -12,6 +14,17 @@ router.post("/verify", authController.verifyEmail);
 router.post("/resend", authController.resendVerify);
 router.patch("/change-password", checkAuth(), authController.changePassword);
 router.get("/all-user", checkAuth(ROLE.ADMIN), authController.allUser);
+router.patch(
+  "/admin/users/:id",
+  checkAuth(ROLE.ADMIN),
+  zodSchemaRequestValidation(adminUserUpdateSchema),
+  authController.userUpdateByAdmin,
+);
+router.delete(
+  "/admin/users/:id",
+  checkAuth(ROLE.ADMIN),
+  authController.userDeleteByAdmin,
+);
 router.get("/me", checkAuth(), authController.getMe);
 router.post("/log-out", authController.lotoutUser);
 

@@ -28,6 +28,7 @@ export const checkAuth =
             user: true,
           },
         });
+        if (!sessionExists?.user) throw new AppError(status.UNAUTHORIZED, "Invalid or expired session");
         if (sessionExists && sessionExists.user) {
           const user = sessionExists.user;
           const now = new Date();
@@ -72,6 +73,7 @@ export const checkAuth =
         if (!verifyAccessToken) {
           throw new AppError(status.UNAUTHORIZED, "invalid access token ");
         }
+        if (verifyAccessToken.userId !== sessionExists.userId) throw new AppError(status.UNAUTHORIZED, "Token does not match session");
         if (
           authRole.length > 0 &&
           !authRole.includes(verifyAccessToken.role as ROLE)

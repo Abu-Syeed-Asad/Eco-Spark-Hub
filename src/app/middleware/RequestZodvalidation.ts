@@ -10,9 +10,9 @@ export const zodSchemaRequestValidation = (zodSchema: z.ZodObject) => {
     };
     const validationRequestData = zodSchema.safeParse(req.body);
     if (!validationRequestData.success) {
-      next(validationRequestData.error);
+      return next(validationRequestData.error);
     }
     req.body = validationRequestData.data;
-    next()
+    return next();
   }
 }

@@ -5,6 +5,7 @@ import { AppError } from "../../error/errorHelpler/AppError";
 import { auth } from "../../lib/auth";
 import type {
   IChangePassword,
+  IAdminUserUpdatePayload,
   ILogin,
   IRegister,
   IUserUpdatePayload,
@@ -381,6 +382,55 @@ const allUserFromService = async () => {
   const data = prisma.user.findMany();
   return data;
 };
+const userUpdateByAdmin = async (
+  userId: string,
+  payload: IAdminUserUpdatePayload,
+) => {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+  });
+  if (!user) {
+    throw new AppError(status.NOT_FOUND, "User not found");
+  }
+
+  const data = { ...payload };
+  if (payload.status === USER_STATUS.DELETE) {
+    Object.assign(data, {
+      isDeleted: true,
+      deletedAt: new Date(),
+    });
+  } else if (
+    payload.status === USER_STATUS.ACTIVE ||
+    payload.status === USER_STATUS.BLOCK
+  ) {
+    Object.assign(data, {
+      isDeleted: false,
+      deletedAt: null,
+    });
+  }
+
+  return prisma.user.update({
+    where: { id: userId },
+    data,
+  });
+};
+const userDeleteByAdmin = async (userId: string) => {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+  });
+  if (!user || user.isDeleted) {
+    throw new AppError(status.NOT_FOUND, "User not found");
+  }
+
+  return prisma.user.update({
+    where: { id: userId },
+    data: {
+      isDeleted: true,
+      deletedAt: new Date(),
+      status: USER_STATUS.DELETE,
+    },
+  });
+};
 
 export const authService = {
   userRegistation,
@@ -396,4 +446,6 @@ export const authService = {
   googleLoginSuccess,
   userUpdate,
   allUserFromService,
+  userUpdateByAdmin,
+  userDeleteByAdmin,
 };

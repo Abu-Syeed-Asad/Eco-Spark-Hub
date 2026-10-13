@@ -5,6 +5,9 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
+    "test:post-notifications": "tsx --test tests/post-notification.test.ts",
+    "test:comments": "tsx --test tests/comment.test.ts",
+    "test:notifications": "tsx --test tests/notification.test.ts",
     "test": "echo \"Error: no test specified\" && exit 1",
     "migrate": "prisma migrate dev",
     "generate": "prisma generate",

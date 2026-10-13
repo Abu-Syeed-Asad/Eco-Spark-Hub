@@ -19,3 +19,13 @@ export const postSchema = z.object({
     return val;
   }, z.number()),
 });
+
+export const postUpdateSchema = z.object({
+  title: postSchema.shape.title.optional(),
+  description: postSchema.shape.description.optional(),
+  photo: z.string().optional(),
+  postType: z.enum(["FREE", "PAID"]).optional(),
+  categoryId: postSchema.shape.categoryId.optional(),
+  taka: postSchema.shape.taka.optional(),
+  status: z.enum(["DRAFT", "APPROVED", "REJECTED"]).optional(),
+}).refine(value => Object.keys(value).length > 0, "Provide at least one post field to update");

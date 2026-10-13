@@ -10,7 +10,7 @@ const createPost = catchAsync(async (req: Request, res: Response) => {
     ...req.body,
     photo: req.file?.path || req.file?.filename || req.body.photo,
   };
-  const result = await postService.createPost(payload);
+  const result = await postService.createPost(payload, req.user);
   sendRespose(res, {
     httpStatusCode: status.OK,
     message: "success fully post created",
@@ -84,6 +84,7 @@ const postUpdateByadmin = catchAsync(async (req: Request, res: Response) => {
   const updateStatus = await postService.postUpdateByadmin(
     postId as string,
     post_status as POST_STATUS,
+    req.user,
   );
 
   sendRespose(res, {

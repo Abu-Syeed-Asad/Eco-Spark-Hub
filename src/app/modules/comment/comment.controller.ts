@@ -1,64 +1,26 @@
-import { status } from 'http-status';
-import type { Request, Response } from "express";
 import { catchAsync } from "../../shared/catchAsync";
 import { commentService } from "./comment.service";
 import { sendRespose } from "../../shared/sendRequest";
-
-
-const createComment = catchAsync(async (req: Request, res: Response) => {
-  const { userId } = req.user;
-  const payload = req.body;
-  const result = await commentService.commentCreate({ ...payload, userId });
-  sendRespose(res, {
-    httpStatusCode: status.OK,
-    success: true,
-    message: "comment successfully created",
-    data:result,
-  })
-})
-const commentShow = catchAsync(async (req: Request, res: Response) => {
-  const { id } = req.query;
-  console.log(id)
-  const allComment = await commentService.showComment(id as string)
-  sendRespose(res, {
-    httpStatusCode: status.OK,
-    success: true,
-    message: "Post related  all comment are here  ",
-    data:allComment,
-  })
-})
-const deleteComment = catchAsync (async (req: Request, res: Response) => {
-  const { id } = req.query;
-  console.log(id)
-  const user = req.user;    
-  const result = await commentService.CommentDelete(id as string, user);
-  sendRespose(res, {
-    httpStatusCode: status.OK,  
-  success: true,
-  message: "comment successfully deleted",
-  data: result,
-  });
-})
-const updateComment = catchAsync(async (req: Request, res: Response) => {
-  const { id } = req.query;
-  
-  const user = req.user;  
-  const payload = req.body;
-  const result = await commentService.commentUpdate(id as string, user, payload);
-  sendRespose(res, {  
-    httpStatusCode: status.OK,
-    success: true,
-    message: "comment successfully updated",
-    data: result,
-  });
-})
-
-
-
-export const commentController ={
-  createComment,
-  commentShow,
-  deleteComment,
-  updateComment
-  
-}
+import { commentIdSchema, commentQuerySchema, createCommentSchema, updateCommentSchema } from "./comment.validation";
+const createComment = catchAsync(async (req, res) => {
+  const payload = createCommentSchema.parse(req.body);
+  const data = await commentService.commentCreate({ ...payload, userId: req.user.userId });
+  sendRespose(res, { httpStatusCode: 201, success: true, message: "Comment posted", data });
+});
+const commentShow = catchAsync(async (req, res) => {
+  const { id, page, limit } = commentQuerySchema.parse(req.query);
+  const data = await commentService.showComment(id, page, limit);
+  sendRespose(res, { httpStatusCode: 200, success: true, message: "Comments retrieved", data });
+});
+const deleteComment = catchAsync(async (req, res) => {
+  const id = commentIdSchema.parse(req.query.id);
+  const data = await commentService.CommentDelete(id, req.user);
+  sendRespose(res, { httpStatusCode: 200, success: true, message: "Comment deleted", data });
+});
+const updateComment = catchAsync(async (req, res) => {
+  const id = commentIdSchema.parse(req.query.id);
+  const payload = updateCommentSchema.parse(req.body);
+  const data = await commentService.commentUpdate(id, req.user, payload);
+  sendRespose(res, { httpStatusCode: 200, success: true, message: "Comment updated", data });
+});
+export const commentController = { createComment, commentShow, deleteComment, updateComment };

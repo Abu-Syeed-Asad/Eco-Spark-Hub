@@ -241,6 +241,34 @@ const allUser = catchAsync(async (req: Request, res: Response) => {
     data,
   });
 });
+const userUpdateByAdmin = catchAsync(async (req: Request, res: Response) => {
+  const userId = req.params.id;
+  if (typeof userId !== "string") {
+    throw new AppError(status.BAD_REQUEST, "A valid user ID is required");
+  }
+
+  const data = await authService.userUpdateByAdmin(userId, req.body);
+  sendRespose(res, {
+    httpStatusCode: status.OK,
+    success: true,
+    message: "User updated successfully",
+    data,
+  });
+});
+const userDeleteByAdmin = catchAsync(async (req: Request, res: Response) => {
+  const userId = req.params.id;
+  if (typeof userId !== "string") {
+    throw new AppError(status.BAD_REQUEST, "A valid user ID is required");
+  }
+
+  const data = await authService.userDeleteByAdmin(userId);
+  sendRespose(res, {
+    httpStatusCode: status.OK,
+    success: true,
+    message: "User deleted successfully",
+    data,
+  });
+});
 export const authController = {
   userLogin,
   userRegistation,
@@ -257,4 +285,6 @@ export const authController = {
   handleOAuthError,
   userUpdate,
   allUser,
+  userUpdateByAdmin,
+  userDeleteByAdmin,
 };

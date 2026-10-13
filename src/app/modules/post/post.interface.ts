@@ -9,7 +9,7 @@ export interface IPostInterface {
   description: string;
   photo?: string;
   postType: POST_TYPE;
-  status: POST_STATUS;
+  status?: POST_STATUS;
   userId: string;
   categoryId: string;
   taka: number;
@@ -19,6 +19,7 @@ export interface IIUpdatePostInterface {
   description?: string;
   photo?: string;
   postType?: POST_TYPE;
-  userId?: string;
+  status?: POST_STATUS;
+  taka?: number;
   categoryId?: string;
 }

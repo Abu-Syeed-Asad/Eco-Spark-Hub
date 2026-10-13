@@ -1,7 +1,10 @@
+import { NotificationService } from "../notification/notification.service";
+import { NOTIFICATION_TYPE, USER_STATUS } from "../../../generated/prisma/enums";
 import status from "http-status";
 import { AppError } from "../../error/errorHelpler/AppError";
 import { prisma } from "../../lib/prisma";
 import type { IIUpdatePostInterface, IPostInterface } from "./post.interface";
+import { postUpdateSchema } from "./post.zodvalidation";
 import type { IQueryParams } from "../../interface/queryBuilder.interface";
 import { QueryBuilder } from "../../utils/QueryBuilder";
 import {
@@ -18,17 +21,28 @@ import { stripe } from "../../config/stripe.config";
 import { envVars } from "../../config/env.config";
 import { randomUUID } from "crypto";
 
-const createPost = async (payload: IPostInterface) => {
-  const postCreate = await prisma.post.create({
-    data: {
-      ...payload,
-      taka: Number(payload.taka) || 0,
-    },
+const createPost = async (payload: IPostInterface, user: IRequestUser) => {
+  const { post, notifications } = await prisma.$transaction(async tx => {
+    const post = await tx.post.create({
+      data: { ...payload, userId: user.userId, status: POST_STATUS.DRAFT, taka: Number(payload.taka) || 0 },
+    });
+    const notifications = [];
+    if (user.role === ROLE.USER) {
+      const creator = await tx.user.findUniqueOrThrow({ where: { id: user.userId }, select: { name: true } });
+      const admins = await tx.user.findMany({
+        where: { role: ROLE.ADMIN, status: USER_STATUS.ACTIVE, isDeleted: false, id: { not: user.userId } },
+        select: { id: true },
+      });
+      for (const admin of admins) notifications.push(await NotificationService.persistNotification({
+        recipientId: admin.id, senderId: user.userId,
+        title: "New post submitted", message: `${creator.name} created a post "${post.title}".`,
+        type: NOTIFICATION_TYPE.SYSTEM, entityId: post.id, entityType: "POST_CREATED",
+      }, tx));
+    }
+    return { post, notifications };
   });
-  if (!postCreate) {
-    throw new AppError(status.BAD_REQUEST, "post create faile ");
-  }
-  return postCreate;
+  notifications.forEach(NotificationService.emitNotification);
+  return post;
 };
 const getAllPost = async (query: IQueryParams) => {
   const queryBuilder = new QueryBuilder<
@@ -50,66 +64,66 @@ const getAllPost = async (query: IQueryParams) => {
     .sort()
     .include({
       user: true,
+      _count: { select: { comments: true } },
       category: true,
     })
     .execute();
 
   return result;
 };
-const updatePost = async (
-  payload: IIUpdatePostInterface,
-  postId: string,
-  user: IRequestUser,
-) => {
-  const isExistPost = await prisma.post.findFirst({
-    where: {
-      id: postId,
-      ...(user.role === ROLE.ADMIN ? {} : { userId: user.userId }),
-    },
+const updatePost = async (payload: IIUpdatePostInterface, postId: string, user: IRequestUser) => {
+  const data = postUpdateSchema.parse(payload);
+  if (user.role !== ROLE.ADMIN && data.status !== undefined) throw new AppError(status.FORBIDDEN, "Only admins can review posts");
+  const { updated, notifications } = await prisma.$transaction(async tx => {
+    const post = await tx.post.findFirst({ where: { id: postId, ...(user.role === ROLE.ADMIN ? {} : { userId: user.userId }) } });
+    if (!post) throw new AppError(status.NOT_FOUND, "Post not found");
+    if (user.role !== ROLE.ADMIN && post.status === POST_STATUS.APPROVED) throw new AppError(status.BAD_REQUEST, "Approved posts cannot be edited by their author");
+    const changes = { ...data, ...(user.role !== ROLE.ADMIN && post.status === POST_STATUS.REJECTED ? { status: POST_STATUS.DRAFT } : {}) };
+    const contentChanged = Object.entries(changes).some(([field, value]) => field !== "status" && value !== undefined && post[field as keyof typeof post] !== value);
+    const statusChanged = changes.status !== undefined && changes.status !== post.status;
+    if (!contentChanged && !statusChanged) return { updated: post, notifications: [] };
+    const writeData = Object.fromEntries(Object.entries(changes).filter(([, value]) => value !== undefined)) as Prisma.PostUncheckedUpdateManyInput;
+    const changed = await tx.post.updateMany({ where: { id: postId, updatedAt: post.updatedAt }, data: writeData });
+    if (!changed.count) throw new AppError(status.CONFLICT, "Post changed. Please refresh and try again.");
+    const updated = await tx.post.findUniqueOrThrow({ where: { id: postId } });
+    const notifications = [];
+    if (user.role === ROLE.ADMIN) {
+      if (statusChanged && (updated.status === POST_STATUS.APPROVED || updated.status === POST_STATUS.REJECTED)) {
+        notifications.push(await NotificationService.persistNotification({
+          recipientId: post.userId, senderId: user.userId,
+          title: updated.status === POST_STATUS.APPROVED ? "Post approved" : "Post rejected",
+          message: `An admin ${updated.status.toLowerCase()} your post "${updated.title}".`,
+          type: updated.status === POST_STATUS.APPROVED ? NOTIFICATION_TYPE.POST_APPROVED : NOTIFICATION_TYPE.POST_REJECTED,
+          entityId: postId, entityType: "POST",
+        }, tx));
+      }
+      if (contentChanged || (statusChanged && updated.status === POST_STATUS.DRAFT)) {
+        notifications.push(await NotificationService.persistNotification({
+          recipientId: post.userId, senderId: user.userId,
+          title: "Post updated", message: `An admin updated your post "${updated.title}"${updated.status === POST_STATUS.DRAFT && statusChanged ? " and moved it to draft" : ""}.`,
+          type: NOTIFICATION_TYPE.SYSTEM, entityId: postId, entityType: "POST_UPDATED",
+        }, tx));
+      }
+    }
+    return { updated, notifications };
   });
-  if (!isExistPost) {
-    throw new AppError(status.NOT_FOUND, "post not found ");
-  }
-  if (user.role !== ROLE.ADMIN && isExistPost.status === POST_STATUS.APPROVED) {
-    throw new AppError(
-      status.BAD_REQUEST,
-      "Your post is Already Approved so you can not change ",
-    );
-  }
-  if (isExistPost.status === POST_STATUS.REJECTED) {
-    const updatedRejectPost = await prisma.post.update({
-      where: {
-        id: postId,
-      },
-      data: {
-        ...payload,
-        status: POST_STATUS.DRAFT,
-      },
-    });
-    return updatedRejectPost;
-  }
-  const updatePost = await prisma.post.update({
-    where: {
-      id: postId,
-    },
-    data: {
-      ...payload,
-    },
-  });
-  return updatePost;
+  notifications.forEach(NotificationService.emitNotification);
+  return updated;
 };
 const deletePost = async (postId: string, user: IRequestUser) => {
-  const postExist = await prisma.post.findFirst({
-    where: {
-      id: postId,
-      ...(user.role === ROLE.ADMIN ? {} : { userId: user.userId }),
-    },
+  const { deleted, notification } = await prisma.$transaction(async tx => {
+    const post = await tx.post.findFirst({ where: { id: postId, ...(user.role === ROLE.ADMIN ? {} : { userId: user.userId }) } });
+    if (!post) throw new AppError(status.NOT_FOUND, "Post not found");
+    const deleted = await tx.post.delete({ where: { id: postId } });
+    const notification = user.role === ROLE.ADMIN ? await NotificationService.persistNotification({
+      recipientId: post.userId, senderId: user.userId,
+      title: "Post deleted", message: `An admin deleted your post "${post.title}".`,
+      type: NOTIFICATION_TYPE.SYSTEM, entityId: postId, entityType: "POST_DELETED",
+    }, tx) : null;
+    return { deleted, notification };
   });
-  if (!postExist) {
-    throw new AppError(status.NOT_FOUND, "post not found ");
-  }
-  const deletePost = await prisma.post.delete({ where: { id: postId } });
-  return deletePost;
+  NotificationService.emitNotification(notification);
+  return deleted;
 };
 const specificPost = async (postId: string, user: IRequestUser) => {
   const { userId, email, role } = user;
@@ -455,40 +469,9 @@ const DashboardPost = async (user: IRequestUser) => {
     };
   }
 };
-const postUpdateByadmin = async (postId: string, Poststatus: POST_STATUS) => {
-  const isExistPost = await prisma.post.findFirst({
-    where: {
-      id: postId,
-    },
-  });
-  if (!isExistPost) {
-    throw new AppError(
-      status.NOT_FOUND,
-      `Your Post id ${postId}  not found in the system`,
-    );
-  }
-
-  if (Poststatus === POST_STATUS.APPROVED) {
-    const approvedPost = await prisma.post.update({
-      where: {
-        id: postId,
-      },
-      data: {
-        status: Poststatus,
-      },
-    });
-    return approvedPost;
-  } else if (Poststatus === POST_STATUS.REJECTED) {
-    const RejectedPost = await prisma.post.update({
-      where: {
-        id: postId,
-      },
-      data: {
-        status: Poststatus,
-      },
-    });
-    return RejectedPost;
-  }
+const postUpdateByadmin = async (postId: string, Poststatus: POST_STATUS, user: IRequestUser) => {
+  if (user.role !== ROLE.ADMIN) throw new AppError(status.FORBIDDEN, "Only admins can review posts");
+  return updatePost({ status: Poststatus }, postId, user);
 };
 export const postService = {
   createPost,

@@ -162,7 +162,20 @@ const paymentHandler = async (event: Stripe.Event) => {
           },
         });
 
+        const notifications = session.payment_status === "paid" ? await Promise.all([
+          NotificationService.persistNotification({
+            recipientId: currentUser.id, senderId: postOwner.id,
+            title: "Payment Successful", message: `Your payment for "${isPostExist.title}" completed successfully.`,
+            type: NOTIFICATION_TYPE.PAYMENT_SUCCESS, entityId: paymentId, entityType: "PAYMENT",
+          }, tx),
+          NotificationService.persistNotification({
+            recipientId: postOwner.id, senderId: currentUser.id,
+            title: "New Payment Received", message: `${currentUser.name} purchased your post "${isPostExist.title}".`,
+            type: NOTIFICATION_TYPE.PAYMENT_SUCCESS, entityId: paymentId, entityType: "PAYMENT",
+          }, tx),
+        ]) : [];
         return {
+          notifications,
           paymentUpdateConfrom,
           createFinanceLog,
           reduceTakaInUser,
@@ -170,6 +183,7 @@ const paymentHandler = async (event: Stripe.Event) => {
         };
       });
 
+      paymentTx.notifications.forEach(NotificationService.emitNotification);
       if (session.payment_status === "paid" && invoiceUrl) {
         try {
           if (userEmail) {
@@ -201,41 +215,7 @@ const paymentHandler = async (event: Stripe.Event) => {
           console.log(error);
         }
       }
-      if (session.payment_status === "paid") {
-        await Promise.all([
-          await NotificationService.createNotification({
-            recipientId: currentUser.id,
 
-            senderId: postOwner.id,
-
-            title: "Payment Successful",
-
-            message: `Your payment for "${isPostExist.title}" completed successfully.`,
-
-            type: NOTIFICATION_TYPE.PAYMENT_SUCCESS,
-
-            entityId: paymentId,
-
-            entityType: "PAYMENT",
-          }),
-
-          await NotificationService.createNotification({
-            recipientId: postOwner.id,
-
-            senderId: currentUser.id,
-
-            title: "New Payment Received",
-
-            message: `${currentUser.name} purchased your post "${isPostExist.title}".`,
-
-            type: NOTIFICATION_TYPE.PAYMENT_SUCCESS,
-
-            entityId: paymentId,
-
-            entityType: "PAYMENT",
-          }),
-        ]);
-      }
       break;
     }
     case "checkout.session.expired": {
