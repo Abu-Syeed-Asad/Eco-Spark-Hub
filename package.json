@@ -5,6 +5,11 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
+    "build": "prisma generate && tsc -p tsconfig.build.json && node scripts/build.mjs",
+    "start": "node dist/server.js",
+    "migrate:deploy": "prisma migrate deploy",
+    "migrate:status": "prisma migrate status",
+    "test:neon": "node scripts/check-neon.mjs",
     "test:post-notifications": "tsx --test tests/post-notification.test.ts",
     "test:comments": "tsx --test tests/comment.test.ts",
     "test:notifications": "tsx --test tests/notification.test.ts",
@@ -30,6 +35,7 @@
     "@types/nodemailer": "^8.0.1",
     "@types/pdfkit": "^0.17.6",
     "@types/pg": "^8.20.0",
+    "esbuild": "0.28.1",
     "eslint": "^10.5.0",
     "eslint-plugin-react": "^7.37.5",
     "globals": "^17.7.0",
@@ -39,6 +45,8 @@
     "typescript-eslint": "^8.62.0"
   },
   "dependencies": {
+    "@neon/config": "^1.9.1",
+    "@neon/env": "^1.6.1",
     "@prisma/adapter-pg": "^7.8.0",
     "@prisma/client": "^7.8.0",
     "better-auth": "^1.6.20",

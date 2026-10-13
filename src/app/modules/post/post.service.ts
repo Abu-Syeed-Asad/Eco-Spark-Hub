@@ -147,10 +147,13 @@ const specificPost = async (postId: string, user: IRequestUser) => {
 
   if (
     role === ROLE.ADMIN ||
-    isExistPost.userId === userId ||
-    isExistPost.postType === POST_TYPE.FREE
+    isExistPost.userId === userId
   ) {
     return isExistPost;
+  }
+
+  if (isExistPost.postType === POST_TYPE.FREE) {
+    throw new AppError(status.NOT_FOUND, "Post not found");
   }
 
   const isExistUser = await prisma.user.findFirst({
@@ -256,214 +259,114 @@ const specificPost = async (postId: string, user: IRequestUser) => {
 const DashboardPost = async (user: IRequestUser) => {
   const { userId, role } = user;
   if (role === ROLE.USER) {
-    const UserDashBoardPost = await prisma.$transaction(async (tx) => {
-      try {
-        const [allposts, totalPost] = await Promise.all([
-          tx.post.findMany({
-            where: {
-              userId,
+    const [
+      allposts,
+      totalPost,
+      ApprovedPost,
+      countApprovedPost,
+      RejectPost,
+      countRejectedPost,
+      DraftedPost,
+      countDraftedPost,
+      paidPost,
+      countPaidPost,
+      freePost,
+      countfreePost,
+    ] = await Promise.all([
+      prisma.post.findMany({
+        where: { userId },
+        include: { category: true },
+      }),
+      prisma.post.count({ where: { userId } }),
+      prisma.post.findMany({
+        where: { status: POST_STATUS.APPROVED, userId },
+        include: { category: true },
+      }),
+      prisma.post.count({ where: { status: POST_STATUS.APPROVED, userId } }),
+      prisma.post.findMany({
+        where: { userId, status: POST_STATUS.REJECTED },
+        include: { category: true },
+      }),
+      prisma.post.count({ where: { userId, status: POST_STATUS.REJECTED } }),
+      prisma.post.findMany({
+        where: { userId, status: POST_STATUS.DRAFT },
+        include: { category: true },
+      }),
+      prisma.post.count({ where: { userId, status: POST_STATUS.DRAFT } }),
+      prisma.post.findMany({
+        where: { userId, postType: POST_TYPE.PAID },
+        include: {
+          payment: {
+            select: {
+              user: { select: { id: true, name: true, email: true } },
             },
-            include: {
-              category: true,
+          },
+          _count: { select: { payment: true } },
+        },
+      }),
+      prisma.post.count({ where: { userId, postType: POST_TYPE.PAID } }),
+      prisma.post.findMany({
+        where: { userId, postType: POST_TYPE.FREE },
+        include: {
+          payment: {
+            select: {
+              user: { select: { id: true, name: true, email: true } },
             },
-          }),
-          tx.post.count({
-            where: {
-              userId,
-            },
-          }),
-        ]);
-        const [ApprovedPost, countApprovedPost] = await Promise.all([
-          tx.post.findMany({
-            where: {
-              status: POST_STATUS.APPROVED,
-              userId,
-            },
-            include: {
-              category: true,
-            },
-          }),
-          tx.post.count({
-            where: {
-              status: POST_STATUS.APPROVED,
-              userId,
-            },
-          }),
-        ]);
+          },
+          _count: { select: { payment: true } },
+        },
+      }),
+      prisma.post.count({ where: { userId, postType: POST_TYPE.FREE } }),
+    ]);
 
-        const [RejectPost, countRejectedPost] = await Promise.all([
-          tx.post.findMany({
-            where: {
-              userId,
-              status: POST_STATUS.REJECTED,
-            },
-            include: {
-              category: true,
-            },
-          }),
-          tx.post.count({
-            where: {
-              userId,
-              status: POST_STATUS.REJECTED,
-            },
-          }),
-        ]);
-
-        const [DraftedPost, countDraftedPost] = await Promise.all([
-          tx.post.findMany({
-            where: {
-              userId,
-              status: POST_STATUS.DRAFT,
-            },
-            include: {
-              category: true,
-            },
-          }),
-          tx.post.count({
-            where: {
-              userId,
-              status: POST_STATUS.DRAFT,
-            },
-          }),
-        ]);
-
-        const [paidPost, countPaidPost] = await Promise.all([
-          tx.post.findMany({
-            where: {
-              userId,
-              postType: POST_TYPE.PAID,
-            },
-            include: {
-              payment: {
-                select: {
-                  user: {
-                    select: {
-                      id: true,
-                      name: true,
-                      email: true,
-                    },
-                  },
-                },
-              },
-              _count: {
-                select: {
-                  payment: true,
-                },
-              },
-            },
-          }),
-          tx.post.count({
-            where: {
-              userId,
-              postType: POST_TYPE.PAID,
-            },
-          }),
-        ]);
-        const [freePost, countfreePost] = await Promise.all([
-          tx.post.findMany({
-            where: {
-              userId,
-              postType: POST_TYPE.FREE,
-            },
-            include: {
-              payment: {
-                select: {
-                  user: {
-                    select: {
-                      id: true,
-                      name: true,
-                      email: true,
-                    },
-                  },
-                },
-              },
-              _count: {
-                select: {
-                  payment: true,
-                },
-              },
-            },
-          }),
-          tx.post.count({
-            where: {
-              userId,
-              postType: POST_TYPE.FREE,
-            },
-          }),
-        ]);
-
-        return {
-          totalPost,
-          allposts,
-          countApprovedPost,
-          ApprovedPost,
-          countRejectedPost,
-          RejectPost,
-          countDraftedPost,
-          DraftedPost,
-          countPaidPost,
-          paidPost,
-          countfreePost,
-          freePost,
-        };
-      } catch (error) {
-        console.log(error);
-      }
-    });
+    const UserDashBoardPost = {
+      totalPost,
+      allposts,
+      countApprovedPost,
+      ApprovedPost,
+      countRejectedPost,
+      RejectPost,
+      countDraftedPost,
+      DraftedPost,
+      countPaidPost,
+      paidPost,
+      countfreePost,
+      freePost,
+    };
     return {
       UserDashBoardPost,
     };
   } else {
-    const adminDashboardPost = await prisma.$transaction(async (tx) => {
-      try {
-        const [allposts, totalPost] = await Promise.all([
-          tx.post.findMany({}),
-          tx.post.count({}),
-        ]);
-        const ApprovedPost = await tx.post.count({
-          where: {
-            status: POST_STATUS.APPROVED,
-          },
-        });
-        const [DraftedPost, countDraftedPost] = await Promise.all([
-          tx.post.findMany({
-            where: {
-              status: POST_STATUS.DRAFT,
-            },
-            include: {
-              category: true,
-            },
-          }),
-          tx.post.count({
-            where: {
-              status: POST_STATUS.DRAFT,
-            },
-          }),
-        ]);
-        const paidPost = await tx.post.count({
-          where: {
-            postType: POST_TYPE.PAID,
-          },
-        });
-        const freePost = await tx.post.count({
-          where: {
-            postType: POST_TYPE.FREE,
-          },
-        });
+    const [
+      allposts,
+      totalPost,
+      ApprovedPost,
+      DraftedPost,
+      countDraftedPost,
+      paidPost,
+      freePost,
+    ] = await Promise.all([
+      prisma.post.findMany({}),
+      prisma.post.count({}),
+      prisma.post.count({ where: { status: POST_STATUS.APPROVED } }),
+      prisma.post.findMany({
+        where: { status: POST_STATUS.DRAFT },
+        include: { category: true },
+      }),
+      prisma.post.count({ where: { status: POST_STATUS.DRAFT } }),
+      prisma.post.count({ where: { postType: POST_TYPE.PAID } }),
+      prisma.post.count({ where: { postType: POST_TYPE.FREE } }),
+    ]);
 
-        return {
-          totalPost,
-          allposts,
-          ApprovedPost,
-          countDraftedPost,
-          DraftedPost,
-          paidPost,
-          freePost,
-        };
-      } catch (error) {
-        console.log(error);
-      }
-    });
+    const adminDashboardPost = {
+      totalPost,
+      allposts,
+      ApprovedPost,
+      countDraftedPost,
+      DraftedPost,
+      paidPost,
+      freePost,
+    };
     return {
       adminDashboardPost,
     };

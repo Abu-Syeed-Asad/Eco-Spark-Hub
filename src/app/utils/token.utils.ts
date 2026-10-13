@@ -44,7 +44,7 @@ const setRefreshTokenInCookie = (res: Response, token: string) => {
 const setSessionTokenInCookie = (res: Response, token: string) => {
   cookieUtils.setcookie(res, "session_token", token, {
     ...getCookieOptions(),
-    maxAge: 60 * 60 * 24 * 1000,
+    maxAge: 60 * 60 * 24 * 7 * 1000,
   });
 };
 

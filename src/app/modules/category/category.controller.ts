@@ -4,6 +4,7 @@ import { categoryService } from "./category.service";
 import { catchAsync } from "../../shared/catchAsync";
 import { sendRespose } from "../../shared/sendRequest";
 import status from "http-status";
+import { AppError } from "../../error/errorHelpler/AppError";
 
 const createCategory = catchAsync(async (req: Request, res: Response) => {
   const payload = req.body;
@@ -26,6 +27,9 @@ const showAllcategory = catchAsync(async (req: Request, res: Response) => {
 });
 const showCategoryById = catchAsync(async (req: Request, res: Response) => {
   const { id } = req.query;
+  if (typeof id !== "string" || !id.trim()) {
+    throw new AppError(status.BAD_REQUEST, "Category id is required");
+  }
   const category = await categoryService.showCategoryById(id as string);
   sendRespose(res, {
     httpStatusCode: status.OK,
@@ -36,6 +40,9 @@ const showCategoryById = catchAsync(async (req: Request, res: Response) => {
 }); 
 const categoryUpdate = catchAsync(async (req: Request, res: Response) => {
   const { id } = req.query;
+  if (typeof id !== "string" || !id.trim()) {
+    throw new AppError(status.BAD_REQUEST, "Category id is required");
+  }
   const payload = req.body; 
   const category = await categoryService.categoryUpdate(id as string, payload);
   sendRespose(res, {
@@ -47,6 +54,9 @@ const categoryUpdate = catchAsync(async (req: Request, res: Response) => {
 } );
 const categoryDelete = catchAsync(async (req: Request, res: Response) => {
   const { id } = req.query;
+  if (typeof id !== "string" || !id.trim()) {
+    throw new AppError(status.BAD_REQUEST, "Category id is required");
+  }
   const category = await categoryService.categoryDelete(id as string);
   sendRespose(res, {
     httpStatusCode: status.OK,

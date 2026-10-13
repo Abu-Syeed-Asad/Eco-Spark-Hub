@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import status from "http-status";
 import { prisma } from "../../lib/prisma"
 import type { Icategory } from "./category.interface"
@@ -6,17 +5,14 @@ import { AppError } from "../../error/errorHelpler/AppError";
 
 
 const createCategory = async (payload:Icategory) => {
-  try {
-    const categoryResult = await prisma.category.create({
-      data: payload
-    });
-    return categoryResult;
-  } catch (error:any) {
-    throw new Error("Failed to create category", { cause: error })
-  }
+  return prisma.category.create({
+    data: payload
+  });
 }
 const showAllcategory = async () => {
-  const allCagegory = await prisma.category.findMany();
+  const allCagegory = await prisma.category.findMany({
+    orderBy: { title: "asc" },
+  });
   return allCagegory;
 }
 const showCategoryById = async (categoryId: string) => {
@@ -26,10 +22,7 @@ const showCategoryById = async (categoryId: string) => {
   if(!isExistCategory){
     throw new AppError(status.NOT_FOUND, "Category not found");
   }
-  const category = await prisma.category.findUnique({
-    where: {  id: categoryId },
-  });
-  return category;
+  return isExistCategory;
 } 
 const categoryUpdate = async (categoryId: string, payload: Icategory) => {
   const isExistCategory = await prisma.category.findUnique({
@@ -47,14 +40,20 @@ const categoryUpdate = async (categoryId: string, payload: Icategory) => {
 const categoryDelete = async (categoryId: string) => {
   const isExistCategory = await prisma.category.findUnique({
     where: { id: categoryId },
-  }); 
+    include: { _count: { select: { post: true } } },
+  });
   if(!isExistCategory){
     throw new AppError(status.NOT_FOUND, "Category not found");
-  } 
-  const category = await prisma.category.delete({
+  }
+  if (isExistCategory._count.post > 0) {
+    throw new AppError(
+      status.CONFLICT,
+      "Category cannot be deleted while posts are assigned to it",
+    );
+  }
+  return prisma.category.delete({
     where: {  id: categoryId },
   });
-  return category;
 }     
 
 

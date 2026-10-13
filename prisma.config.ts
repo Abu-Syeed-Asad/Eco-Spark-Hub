@@ -7,6 +7,7 @@ export default defineConfig({
     path: "prisma/migrations",
   },
   datasource: {
-    url: env("DATABASE_URL"),
+    // Schema tooling needs a direct connection; app requests use the pooled URL.
+    url: process.env.DATABASE_URL_UNPOOLED || env("DATABASE_URL"),
   },
 });

@@ -1,0 +1,6 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "noEmit": true },
+  "include": ["src/**/*.ts", "neon.ts", "prisma.config.ts"],
+  "exclude": ["node_modules", "dist", "tests", "test_payment_flow.ts"]
+}
